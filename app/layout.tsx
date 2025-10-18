@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: '네이버 키워드 파인더',
   description: '네이버 검색광고 API를 활용한 황금키워드 찾기 도구',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

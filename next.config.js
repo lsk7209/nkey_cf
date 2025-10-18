@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   env: {
     SEARCHAD_BASE: process.env.SEARCHAD_BASE,
     SEARCHAD_API_KEY: process.env.SEARCHAD_API_KEY,

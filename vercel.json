@@ -3,5 +3,13 @@
     "app/api/collections/[id]/collect/route.ts": {
       "maxDuration": 300
     }
+  },
+  "env": {
+    "SEARCHAD_BASE": "@searchad_base",
+    "SEARCHAD_API_KEY": "@searchad_api_key",
+    "SEARCHAD_SECRET": "@searchad_secret",
+    "SEARCHAD_CUSTOMER_ID": "@searchad_customer_id",
+    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key"
   }
 }

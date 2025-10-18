@@ -5,10 +5,14 @@ export async function GET() {
   try {
     const collections = await keywordDB.getCollections()
     return NextResponse.json(collections)
-  } catch (error) {
+  } catch (error: any) {
     console.error('수집 세션 목록 조회 오류:', error)
     return NextResponse.json(
-      { message: '수집 세션 목록을 불러오는데 실패했습니다.' },
+      { 
+        message: '수집 세션 목록을 불러오는데 실패했습니다.',
+        error: error?.message || String(error),
+        details: error?.details || null
+      },
       { status: 500 }
     )
   }
@@ -35,10 +39,14 @@ export async function POST(request: NextRequest) {
 
     const collection = await keywordDB.createCollection(name, description || '', seedKeywords)
     return NextResponse.json(collection)
-  } catch (error) {
+  } catch (error: any) {
     console.error('수집 세션 생성 오류:', error)
     return NextResponse.json(
-      { message: '수집 세션 생성에 실패했습니다.' },
+      { 
+        message: '수집 세션 생성에 실패했습니다.',
+        error: error?.message || String(error),
+        details: error?.details || null
+      },
       { status: 500 }
     )
   }
