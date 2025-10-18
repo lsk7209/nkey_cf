@@ -31,7 +31,7 @@ export interface ProcessedKeywordData {
   fetched_at: string;
 }
 
-class NaverSearchAdAPI {
+export class NaverKeywordAPI {
   private baseUrl: string;
   private apiKey: string;
   private secret: string;
@@ -170,6 +170,28 @@ class NaverSearchAdAPI {
 
     return results;
   }
+
+  // 시드키워드로부터 연관키워드 목록 가져오기 (상세 정보 없이)
+  async getRelatedKeywords(seedKeyword: string): Promise<string[]> {
+    try {
+      const keywords = await this.getKeywords([seedKeyword], false);
+      return keywords.map(k => k.keyword).slice(0, 5); // 최대 5개만 반환
+    } catch (error) {
+      console.error('연관키워드 조회 실패:', error);
+      return [];
+    }
+  }
+
+  // 특정 키워드의 상세 통계 정보 가져오기
+  async getKeywordStats(keyword: string): Promise<ProcessedKeywordData | null> {
+    try {
+      const results = await this.getKeywords([keyword], true);
+      return results.length > 0 ? results[0] : null;
+    } catch (error) {
+      console.error(`키워드 "${keyword}" 통계 조회 실패:`, error);
+      return null;
+    }
+  }
 }
 
-export const naverAPI = new NaverSearchAdAPI();
+export const naverAPI = new NaverKeywordAPI();
