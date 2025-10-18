@@ -15,6 +15,11 @@ CREATE TABLE manual_collection_results (
   ctr_mobile DECIMAL(5,2) DEFAULT 0,
   ad_count INTEGER DEFAULT 0,
   comp_idx VARCHAR(20),
+  -- 문서수 필드 추가
+  blog_count INTEGER DEFAULT 0,
+  news_count INTEGER DEFAULT 0,
+  webkr_count INTEGER DEFAULT 0,
+  cafe_count INTEGER DEFAULT 0,
   raw_json TEXT,
   fetched_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

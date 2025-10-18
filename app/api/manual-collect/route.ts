@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NaverKeywordAPI } from '@/lib/naver-api'
+import { NaverDocumentAPI } from '@/lib/naver-document-api'
 import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
 
     // 네이버 API 인스턴스 생성
     const naverAPI = new NaverKeywordAPI()
+    const documentAPI = new NaverDocumentAPI()
 
     // 시드키워드로 연관키워드 수집
     const relatedKeywords = await naverAPI.getRelatedKeywords(seedKeyword)
@@ -37,11 +39,27 @@ export async function POST(request: NextRequest) {
       try {
         const details = await naverAPI.getKeywordStats(keyword)
         if (details) {
-          keywordDetails.push(details)
+          // 문서수 정보 수집
+          try {
+            const documentCounts = await documentAPI.getDocumentCounts(keyword)
+            // 문서수 정보를 details에 추가
+            const detailsWithDocuments = {
+              ...details,
+              blog_count: documentCounts.blog,
+              news_count: documentCounts.news,
+              webkr_count: documentCounts.webkr,
+              cafe_count: documentCounts.cafe
+            }
+            keywordDetails.push(detailsWithDocuments)
+          } catch (docError) {
+            console.error(`키워드 "${keyword}" 문서수 수집 실패:`, docError)
+            // 문서수 수집 실패해도 기본 정보는 저장
+            keywordDetails.push(details)
+          }
         }
         
         // API 제한을 고려한 대기 (429 에러 방지)
-        await new Promise(resolve => setTimeout(resolve, 200))
+        await new Promise(resolve => setTimeout(resolve, 300))
       } catch (error) {
         console.error(`키워드 "${keyword}" 상세 정보 수집 실패:`, error)
         // 개별 키워드 실패는 전체를 중단하지 않음
@@ -63,6 +81,10 @@ export async function POST(request: NextRequest) {
           ctr_mobile: detail.ctr_mobile,
           ad_count: detail.ad_count,
           comp_idx: detail.comp_idx,
+          blog_count: detail.blog_count || 0,
+          news_count: detail.news_count || 0,
+          webkr_count: detail.webkr_count || 0,
+          cafe_count: detail.cafe_count || 0,
           raw_json: detail.raw_json,
           fetched_at: detail.fetched_at
         }))

@@ -15,6 +15,10 @@ interface KeywordData {
   ctr_mobile: number
   ad_count: number
   comp_idx: string
+  blog_count: number
+  news_count: number
+  webkr_count: number
+  cafe_count: number
   created_at: string
 }
 
@@ -122,7 +126,7 @@ export default function DataPage() {
   const exportToCSV = () => {
     if (data.length === 0) return
 
-    const headers = ['시드키워드', '키워드', 'PC 검색량', '모바일 검색량', '총 검색량', 'PC 월간 클릭수', '모바일 월간 클릭수', 'PC CTR', '모바일 CTR', '광고수', '경쟁지수', '수집일시']
+    const headers = ['시드키워드', '키워드', 'PC 검색량', '모바일 검색량', '총 검색량', 'PC 월간 클릭수', '모바일 월간 클릭수', 'PC CTR', '모바일 CTR', '광고수', '경쟁지수', '블로그', '뉴스', '웹문서', '카페', '수집일시']
     
     const escapeCSVField = (field: any): string => {
       const str = String(field || '')
@@ -146,6 +150,10 @@ export default function DataPage() {
         escapeCSVField(item.ctr_mobile),
         escapeCSVField(item.ad_count),
         escapeCSVField(item.comp_idx),
+        escapeCSVField(item.blog_count),
+        escapeCSVField(item.news_count),
+        escapeCSVField(item.webkr_count),
+        escapeCSVField(item.cafe_count),
         escapeCSVField(new Date(item.created_at).toLocaleString('ko-KR'))
       ].join(','))
     ].join('\n')
@@ -324,6 +332,18 @@ export default function DataPage() {
                       경쟁지수
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      블로그
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      뉴스
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      웹문서
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      카페
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       수집일시
                     </th>
                   </tr>
@@ -363,6 +383,18 @@ export default function DataPage() {
                         }`}>
                           {item.comp_idx}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.blog_count.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.news_count.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.webkr_count.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.cafe_count.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(item.created_at).toLocaleString('ko-KR')}
