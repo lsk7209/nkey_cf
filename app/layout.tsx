@@ -33,9 +33,6 @@ export default function RootLayout({
                   <a href="/" className="text-gray-600 hover:text-gray-900">
                     홈
                   </a>
-                  <a href="/manual" className="text-gray-600 hover:text-gray-900">
-                    수동수집
-                  </a>
                   <a href="/collect" className="text-gray-600 hover:text-gray-900">
                     키워드 수집
                   </a>
