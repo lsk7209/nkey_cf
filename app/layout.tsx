@@ -30,14 +30,8 @@ export default function RootLayout({
                   </h1>
                 </div>
                 <nav className="flex space-x-4">
-                  <a href="/" className="text-gray-600 hover:text-gray-900">
-                    홈
-                  </a>
-                  <a href="/collect" className="text-gray-600 hover:text-gray-900">
-                    키워드 수집
-                  </a>
-                  <a href="/collections" className="text-gray-600 hover:text-gray-900">
-                    수집 내역
+                  <a href="/manual" className="text-gray-600 hover:text-gray-900">
+                    수동수집
                   </a>
                 </nav>
               </div>
