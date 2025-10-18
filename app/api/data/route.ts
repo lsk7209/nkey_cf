@@ -1,0 +1,134 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '100')
+    const search = searchParams.get('search') || ''
+    const sortBy = searchParams.get('sortBy') || 'total_search'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const seedKeyword = searchParams.get('seedKeyword') || ''
+
+    // 페이지네이션 계산
+    const offset = (page - 1) * limit
+
+    // 쿼리 빌더 시작
+    let query = supabase
+      .from('manual_collection_results')
+      .select('*', { count: 'exact' })
+
+    // 검색 조건 추가
+    if (search) {
+      query = query.ilike('keyword', `%${search}%`)
+    }
+
+    // 시드키워드 필터 추가
+    if (seedKeyword) {
+      query = query.eq('seed_keyword', seedKeyword)
+    }
+
+    // 정렬 추가
+    const validSortColumns = ['total_search', 'pc_search', 'mobile_search', 'created_at', 'keyword']
+    const validSortOrders = ['asc', 'desc']
+    
+    if (validSortColumns.includes(sortBy) && validSortOrders.includes(sortOrder)) {
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+    } else {
+      query = query.order('total_search', { ascending: false })
+    }
+
+    // 페이지네이션 적용
+    query = query.range(offset, offset + limit - 1)
+
+    const { data, error, count } = await query
+
+    if (error) {
+      console.error('데이터 조회 오류:', error)
+      return NextResponse.json(
+        { 
+          message: '데이터를 불러오는데 실패했습니다.',
+          error: error.message
+        },
+        { status: 500 }
+      )
+    }
+
+    // 총 페이지 수 계산
+    const totalPages = Math.ceil((count || 0) / limit)
+
+    return NextResponse.json({
+      data: data || [],
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      },
+      filters: {
+        search,
+        seedKeyword,
+        sortBy,
+        sortOrder
+      }
+    })
+
+  } catch (error: any) {
+    console.error('데이터 API 오류:', error)
+    return NextResponse.json(
+      { 
+        message: '서버 오류가 발생했습니다.',
+        error: error?.message || String(error)
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// 시드키워드 목록 조회
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { action } = body
+
+    if (action === 'getSeedKeywords') {
+      const { data, error } = await supabase
+        .from('manual_collection_results')
+        .select('seed_keyword')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('시드키워드 조회 오류:', error)
+        return NextResponse.json(
+          { message: '시드키워드 목록을 불러오는데 실패했습니다.' },
+          { status: 500 }
+        )
+      }
+
+      // 중복 제거
+      const uniqueSeedKeywords = [...new Set(data?.map(item => item.seed_keyword) || [])]
+
+      return NextResponse.json({
+        seedKeywords: uniqueSeedKeywords
+      })
+    }
+
+    return NextResponse.json(
+      { message: '잘못된 요청입니다.' },
+      { status: 400 }
+    )
+
+  } catch (error: any) {
+    console.error('데이터 API POST 오류:', error)
+    return NextResponse.json(
+      { 
+        message: '서버 오류가 발생했습니다.',
+        error: error?.message || String(error)
+      },
+      { status: 500 }
+    )
+  }
+}

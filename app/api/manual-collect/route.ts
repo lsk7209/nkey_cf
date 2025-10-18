@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NaverKeywordAPI } from '@/lib/naver-api'
+import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,10 +48,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 수집된 키워드 데이터를 데이터베이스에 저장
+    if (keywordDetails.length > 0) {
+      try {
+        const insertData = keywordDetails.map(detail => ({
+          seed_keyword: seedKeyword,
+          keyword: detail.keyword,
+          pc_search: detail.pc_search,
+          mobile_search: detail.mobile_search,
+          total_search: detail.total_search,
+          monthly_click_pc: detail.monthly_click_pc,
+          monthly_click_mobile: detail.monthly_click_mobile,
+          ctr_pc: detail.ctr_pc,
+          ctr_mobile: detail.ctr_mobile,
+          ad_count: detail.ad_count,
+          comp_idx: detail.comp_idx,
+          raw_json: detail.raw_json,
+          fetched_at: detail.fetched_at
+        }))
+
+        const { error: insertError } = await supabase
+          .from('manual_collection_results')
+          .insert(insertData)
+
+        if (insertError) {
+          console.error('데이터베이스 저장 오류:', insertError)
+          // 저장 실패해도 수집 결과는 반환
+        } else {
+          console.log(`${keywordDetails.length}개 키워드 데이터 저장 완료`)
+        }
+      } catch (dbError) {
+        console.error('데이터베이스 저장 중 오류:', dbError)
+        // 저장 실패해도 수집 결과는 반환
+      }
+    }
+
     return NextResponse.json({
       message: '수집 완료',
       seedKeyword,
-      keywords: keywordDetails
+      keywords: keywordDetails,
+      savedCount: keywordDetails.length
     })
 
   } catch (error: any) {

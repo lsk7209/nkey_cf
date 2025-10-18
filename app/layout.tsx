@@ -29,11 +29,14 @@ export default function RootLayout({
                     네이버 키워드 파인더
                   </h1>
                 </div>
-                <nav className="flex space-x-4">
-                  <a href="/manual" className="text-gray-600 hover:text-gray-900">
-                    수동수집
-                  </a>
-                </nav>
+                    <nav className="flex space-x-4">
+                      <a href="/manual" className="text-gray-600 hover:text-gray-900">
+                        수동수집
+                      </a>
+                      <a href="/data" className="text-gray-600 hover:text-gray-900">
+                        데이터
+                      </a>
+                    </nav>
               </div>
             </div>
           </header>
