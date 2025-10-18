@@ -175,11 +175,50 @@ export default function DataPage() {
     setSortOrder('desc')
   }
 
+  // 문서수 일괄 업데이트
+  const updateAllDocumentCounts = async () => {
+    if (!confirm('모든 키워드의 문서수를 수집하시겠습니까? 이 작업은 시간이 오래 걸릴 수 있습니다.')) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch('/api/update-document-counts', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || '문서수 업데이트에 실패했습니다.')
+      }
+
+      const result = await response.json()
+      alert(`문서수 업데이트 완료!\n총 ${result.totalKeywords}개 키워드 중 ${result.updatedCount}개 업데이트됨`)
+      
+      // 데이터 새로고침
+      loadData(pagination.page)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '문서수 업데이트 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">수집 데이터</h1>
         <div className="flex space-x-2">
+          <button
+            onClick={updateAllDocumentCounts}
+            disabled={loading}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {loading ? '처리 중...' : '문서수 수집'}
+          </button>
           <button
             onClick={exportToCSV}
             disabled={data.length === 0}
