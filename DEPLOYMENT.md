@@ -67,14 +67,25 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 1. Vercel 대시보드에서 프로젝트 선택
 2. "Settings" 탭 클릭
 3. "Environment Variables" 섹션에서 "Add New" 클릭
-4. 각 변수명과 값을 입력
+4. 각 변수명과 값을 직접 입력 (시크릿 참조 사용하지 않음)
 5. "Production", "Preview", "Development" 환경 모두에 적용
 6. "Save" 클릭
+
+**환경 변수 목록:**
+```
+SEARCHAD_BASE=https://api.naver.com
+SEARCHAD_API_KEY=your_access_license_here
+SEARCHAD_SECRET=your_secret_key_here
+SEARCHAD_CUSTOMER_ID=your_customer_id_here
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+```
 
 **주의사항:**
 - 모든 환경 변수는 반드시 설정해야 빌드가 성공합니다
 - `NEXT_PUBLIC_` 접두사가 붙은 변수는 클라이언트에서도 접근 가능합니다
 - 환경 변수 설정 후 새로운 배포를 트리거해야 적용됩니다
+- 시크릿 참조(@변수명)는 사용하지 말고 직접 값을 입력하세요
 
 ### 3.4 배포 확인
 1. "Deployments" 탭에서 배포 상태 확인
