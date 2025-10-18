@@ -27,6 +27,10 @@ export interface ProcessedKeywordData {
   ctr_mobile: number;
   ad_count: number;
   comp_idx: string;
+  blog_count?: number;
+  news_count?: number;
+  webkr_count?: number;
+  cafe_count?: number;
   raw_json: string;
   fetched_at: string;
 }
