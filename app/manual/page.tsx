@@ -99,23 +99,36 @@ export default function ManualCollectPage() {
     if (keywords.length === 0) return
 
     const headers = ['키워드', 'PC 검색량', '모바일 검색량', '총 검색량', 'PC 월간 클릭수', '모바일 월간 클릭수', 'PC CTR', '모바일 CTR', '광고수', '경쟁지수']
+    
+    // CSV 데이터를 안전하게 처리하는 함수
+    const escapeCSVField = (field: any): string => {
+      const str = String(field || '')
+      // 쉼표, 따옴표, 줄바꿈이 포함된 경우 따옴표로 감싸고 내부 따옴표는 이스케이프
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
     const csvContent = [
-      headers.join(','),
+      headers.map(escapeCSVField).join(','),
       ...keywords.map(k => [
-        k.keyword,
-        k.pc_search,
-        k.mobile_search,
-        k.total_search,
-        k.monthly_click_pc,
-        k.monthly_click_mobile,
-        k.ctr_pc,
-        k.ctr_mobile,
-        k.ad_count,
-        k.comp_idx
+        escapeCSVField(k.keyword),
+        escapeCSVField(k.pc_search),
+        escapeCSVField(k.mobile_search),
+        escapeCSVField(k.total_search),
+        escapeCSVField(k.monthly_click_pc),
+        escapeCSVField(k.monthly_click_mobile),
+        escapeCSVField(k.ctr_pc),
+        escapeCSVField(k.ctr_mobile),
+        escapeCSVField(k.ad_count),
+        escapeCSVField(k.comp_idx)
       ].join(','))
     ].join('\n')
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    // UTF-8 BOM 추가하여 한글 깨짐 방지
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
