@@ -198,8 +198,64 @@ export class NaverKeywordAPI {
   // 시드키워드로부터 연관키워드 목록 가져오기 (상세 정보 없이)
   async getRelatedKeywords(seedKeyword: string): Promise<string[]> {
     try {
-      const keywords = await this.getKeywords([seedKeyword], false);
-      return keywords.map(k => k.keyword); // 모든 연관키워드 반환
+      // 1차: 기본 연관키워드 수집
+      const primaryKeywords = await this.getKeywords([seedKeyword], false);
+      let allKeywords = primaryKeywords.map(k => k.keyword);
+      
+      console.log(`1차 수집: ${allKeywords.length}개 키워드`);
+      
+      // 2차: 수집된 키워드들을 다시 힌트로 사용하여 추가 키워드 수집
+      if (allKeywords.length > 0) {
+        const batchSize = 5; // API 제한에 맞춰 5개씩 처리
+        const additionalKeywords = new Set<string>();
+        
+        // 기존 키워드들을 5개씩 묶어서 추가 수집
+        for (let i = 0; i < Math.min(allKeywords.length, 10); i += batchSize) {
+          const batch = allKeywords.slice(i, i + batchSize);
+          
+          try {
+            const batchKeywords = await this.getKeywords(batch, false);
+            batchKeywords.forEach(k => {
+              if (k.keyword !== seedKeyword && !allKeywords.includes(k.keyword)) {
+                additionalKeywords.add(k.keyword);
+              }
+            });
+            
+            // API 제한을 고려한 대기
+            await new Promise(resolve => setTimeout(resolve, 200));
+          } catch (error) {
+            console.error(`배치 ${i}-${i + batchSize} 수집 실패:`, error);
+          }
+        }
+        
+        allKeywords = [...allKeywords, ...Array.from(additionalKeywords)];
+        console.log(`2차 수집 후 총 ${allKeywords.length}개 키워드`);
+      }
+      
+      // 3차: 특정 패턴으로 추가 키워드 생성 (맛집 관련)
+      if (seedKeyword.includes('맛집') || seedKeyword.includes('음식')) {
+        const locationKeywords = [
+          '강남', '홍대', '신촌', '이태원', '명동', '동대문', '건대', '성수', '압구정', '청담',
+          '잠실', '송파', '강동', '마포', '서초', '용산', '중구', '종로', '성북', '노원',
+          '은평', '서대문', '동대문구', '성동', '광진', '중랑', '강북', '도봉', '관악', '금천',
+          '영등포', '양천', '구로', '금천', '동작', '강서', '양천', '서초', '강남구', '송파구'
+        ];
+        
+        const additionalPatterns = [];
+        for (const location of locationKeywords.slice(0, 10)) { // 상위 10개 지역만
+          if (!allKeywords.includes(`${location}맛집`)) {
+            additionalPatterns.push(`${location}맛집`);
+          }
+          if (!allKeywords.includes(`${location}역맛집`)) {
+            additionalPatterns.push(`${location}역맛집`);
+          }
+        }
+        
+        allKeywords = [...allKeywords, ...additionalPatterns];
+        console.log(`3차 패턴 생성 후 총 ${allKeywords.length}개 키워드`);
+      }
+      
+      return allKeywords;
     } catch (error) {
       console.error('연관키워드 조회 실패:', error);
       return [];
