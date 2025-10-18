@@ -50,27 +50,36 @@ export class NaverKeywordAPI {
     return CryptoJS.enc.Base64.stringify(signature);
   }
 
-  private normalizeNumber(value: string): number {
-    if (!value || value === '') return 0;
+  private normalizeNumber(value: any): number {
+    // null, undefined, 빈 문자열 체크
+    if (value === null || value === undefined || value === '') return 0;
+    
+    // 문자열로 변환
+    const stringValue = String(value);
     
     // "< 10" 같은 문자열 처리
-    if (value.includes('<')) {
-      const match = value.match(/< (\d+)/);
+    if (stringValue.includes('<')) {
+      const match = stringValue.match(/< (\d+)/);
       return match ? parseInt(match[1]) : 0;
     }
     
     // 숫자만 추출
-    const numericValue = value.replace(/[^\d.-]/g, '');
+    const numericValue = stringValue.replace(/[^\d.-]/g, '');
     return parseFloat(numericValue) || 0;
   }
 
   private processKeywordData(data: NaverKeywordData): ProcessedKeywordData {
+    // 데이터 유효성 검증
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid keyword data received from API');
+    }
+
     const pcSearch = this.normalizeNumber(data.monthlyPcQcCnt);
     const mobileSearch = this.normalizeNumber(data.monthlyMobileQcCnt);
     const totalSearch = pcSearch + mobileSearch;
 
     return {
-      keyword: data.relKeyword,
+      keyword: data.relKeyword || '',
       pc_search: pcSearch,
       mobile_search: mobileSearch,
       total_search: totalSearch,
@@ -79,7 +88,7 @@ export class NaverKeywordAPI {
       ctr_pc: this.normalizeNumber(data.monthlyAvePcCtr),
       ctr_mobile: this.normalizeNumber(data.monthlyAveMobileCtr),
       ad_count: this.normalizeNumber(data.plAvgDepth),
-      comp_idx: data.compIdx,
+      comp_idx: data.compIdx || 'UNKNOWN',
       raw_json: JSON.stringify(data),
       fetched_at: new Date().toISOString(),
     };
@@ -131,11 +140,22 @@ export class NaverKeywordAPI {
 
       const data: NaverApiResponse = await response.json();
       
-      if (!data.keywordList) {
+      if (!data || !data.keywordList || !Array.isArray(data.keywordList)) {
+        console.warn('Invalid API response structure:', data);
         return [];
       }
 
-      return data.keywordList.map(item => this.processKeywordData(item));
+      return data.keywordList
+        .filter(item => item && typeof item === 'object') // 유효한 데이터만 필터링
+        .map(item => {
+          try {
+            return this.processKeywordData(item);
+          } catch (error) {
+            console.error('Error processing keyword data:', error, item);
+            return null;
+          }
+        })
+        .filter(item => item !== null) as ProcessedKeywordData[]; // null 값 제거
     } catch (error) {
       console.error('네이버 API 호출 오류:', error);
       throw error;
