@@ -195,7 +195,7 @@ export class NaverKeywordAPI {
   async getRelatedKeywords(seedKeyword: string): Promise<string[]> {
     try {
       const keywords = await this.getKeywords([seedKeyword], false);
-      return keywords.map(k => k.keyword).slice(0, 5); // 최대 5개만 반환
+      return keywords.map(k => k.keyword); // 모든 연관키워드 반환
     } catch (error) {
       console.error('연관키워드 조회 실패:', error);
       return [];
