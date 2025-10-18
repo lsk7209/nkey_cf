@@ -1,4 +1,5 @@
 import CryptoJS from 'crypto-js';
+import { ApiKeyManager } from './api-key-manager';
 
 export interface NaverKeywordData {
   relKeyword: string;
@@ -37,20 +38,16 @@ export interface ProcessedKeywordData {
 
 export class NaverKeywordAPI {
   private baseUrl: string;
-  private apiKey: string;
-  private secret: string;
-  private customerId: string;
+  private apiKeyManager: ApiKeyManager;
 
   constructor() {
     this.baseUrl = process.env.SEARCHAD_BASE || 'https://api.naver.com';
-    this.apiKey = process.env.SEARCHAD_API_KEY || '';
-    this.secret = process.env.SEARCHAD_SECRET || '';
-    this.customerId = process.env.SEARCHAD_CUSTOMER_ID || '';
+    this.apiKeyManager = new ApiKeyManager();
   }
 
-  private generateSignature(timestamp: string, method: string, uri: string): string {
+  private generateSignature(timestamp: string, method: string, uri: string, secret: string): string {
     const message = `${timestamp}.${method}.${uri}`;
-    const signature = CryptoJS.HmacSHA256(message, this.secret);
+    const signature = CryptoJS.HmacSHA256(message, secret);
     return CryptoJS.enc.Base64.stringify(signature);
   }
 
@@ -107,10 +104,16 @@ export class NaverKeywordAPI {
       throw new Error('최대 5개의 힌트 키워드만 허용됩니다.');
     }
 
+    // 사용 가능한 API 키 가져오기
+    const apiKeyInfo = this.apiKeyManager.getAvailableApiKey();
+    if (!apiKeyInfo) {
+      throw new Error('사용 가능한 API 키가 없습니다.');
+    }
+
     const timestamp = Date.now().toString();
     const method = 'GET';
     const uri = '/keywordstool';
-    const signature = this.generateSignature(timestamp, method, uri);
+    const signature = this.generateSignature(timestamp, method, uri, apiKeyInfo.secret);
 
     const params = new URLSearchParams({
       hintKeywords: hintKeywords.join(','),
@@ -122,8 +125,8 @@ export class NaverKeywordAPI {
     const headers = {
       'Content-Type': 'application/json; charset=UTF-8',
       'X-Timestamp': timestamp,
-      'X-API-KEY': this.apiKey,
-      'X-Customer': this.customerId,
+      'X-API-KEY': apiKeyInfo.apiKey,
+      'X-Customer': apiKeyInfo.customerId,
       'X-Signature': signature,
     };
 
@@ -133,7 +136,12 @@ export class NaverKeywordAPI {
         headers,
       });
 
+      // API 사용량 증가
+      this.apiKeyManager.incrementUsage(apiKeyInfo.id);
+
       if (response.status === 429) {
+        // 해당 API 키 비활성화
+        this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
         throw new Error('API 호출 한도 초과. 잠시 후 다시 시도해주세요.');
       }
 
@@ -232,28 +240,10 @@ export class NaverKeywordAPI {
         console.log(`2차 수집 후 총 ${allKeywords.length}개 키워드`);
       }
       
-      // 3차: 특정 패턴으로 추가 키워드 생성 (맛집 관련)
-      if (seedKeyword.includes('맛집') || seedKeyword.includes('음식')) {
-        const locationKeywords = [
-          '강남', '홍대', '신촌', '이태원', '명동', '동대문', '건대', '성수', '압구정', '청담',
-          '잠실', '송파', '강동', '마포', '서초', '용산', '중구', '종로', '성북', '노원',
-          '은평', '서대문', '동대문구', '성동', '광진', '중랑', '강북', '도봉', '관악', '금천',
-          '영등포', '양천', '구로', '금천', '동작', '강서', '양천', '서초', '강남구', '송파구'
-        ];
-        
-        const additionalPatterns = [];
-        for (const location of locationKeywords.slice(0, 10)) { // 상위 10개 지역만
-          if (!allKeywords.includes(`${location}맛집`)) {
-            additionalPatterns.push(`${location}맛집`);
-          }
-          if (!allKeywords.includes(`${location}역맛집`)) {
-            additionalPatterns.push(`${location}역맛집`);
-          }
-        }
-        
-        allKeywords = [...allKeywords, ...additionalPatterns];
-        console.log(`3차 패턴 생성 후 총 ${allKeywords.length}개 키워드`);
-      }
+      // 3차: 특정 패턴으로 추가 키워드 생성
+      const additionalPatterns = this.generateKeywordPatterns(seedKeyword, allKeywords);
+      allKeywords = [...allKeywords, ...additionalPatterns];
+      console.log(`3차 패턴 생성 후 총 ${allKeywords.length}개 키워드`);
       
       return allKeywords;
     } catch (error) {
@@ -271,6 +261,114 @@ export class NaverKeywordAPI {
       console.error(`키워드 "${keyword}" 통계 조회 실패:`, error);
       return null;
     }
+  }
+
+  // 키워드 패턴 생성 (황금 키워드 수집을 위한 확장)
+  private generateKeywordPatterns(seedKeyword: string, existingKeywords: string[]): string[] {
+    const patterns: string[] = [];
+    
+    // 맛집 관련 패턴
+    if (seedKeyword.includes('맛집') || seedKeyword.includes('음식') || seedKeyword.includes('식당')) {
+      const locations = [
+        '강남', '홍대', '신촌', '이태원', '명동', '동대문', '건대', '성수', '압구정', '청담',
+        '잠실', '송파', '강동', '마포', '서초', '용산', '중구', '종로', '성북', '노원',
+        '은평', '서대문', '동대문구', '성동', '광진', '중랑', '강북', '도봉', '관악', '금천',
+        '영등포', '양천', '구로', '동작', '강서', '강남구', '송파구', '마포구', '서초구', '용산구',
+        '서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원',
+        '충북', '충남', '전북', '전남', '경북', '경남', '제주'
+      ];
+      
+      const foodTypes = [
+        '한식', '중식', '일식', '양식', '분식', '치킨', '피자', '햄버거', '샐러드', '디저트',
+        '카페', '베이커리', '떡볶이', '순대', '김밥', '라면', '돈까스', '회', '초밥', '라멘',
+        '파스타', '스테이크', '샐러드', '샌드위치', '브런치', '아침', '점심', '저녁', '야식', '술집'
+      ];
+      
+      // 지역 + 맛집 패턴
+      locations.slice(0, 20).forEach(location => {
+        if (!existingKeywords.includes(`${location}맛집`)) {
+          patterns.push(`${location}맛집`);
+        }
+        if (!existingKeywords.includes(`${location}역맛집`)) {
+          patterns.push(`${location}역맛집`);
+        }
+        if (!existingKeywords.includes(`${location}근처맛집`)) {
+          patterns.push(`${location}근처맛집`);
+        }
+      });
+      
+      // 음식 종류 + 맛집 패턴
+      foodTypes.forEach(food => {
+        if (!existingKeywords.includes(`${food}맛집`)) {
+          patterns.push(`${food}맛집`);
+        }
+        if (!existingKeywords.includes(`맛있는${food}`)) {
+          patterns.push(`맛있는${food}`);
+        }
+      });
+    }
+    
+    // 쇼핑 관련 패턴
+    if (seedKeyword.includes('쇼핑') || seedKeyword.includes('몰') || seedKeyword.includes('백화점')) {
+      const shoppingTypes = [
+        '온라인쇼핑', '오프라인쇼핑', '패션쇼핑', '뷰티쇼핑', '홈쇼핑', '쇼핑몰', '백화점',
+        '아울렛', '마트', '편의점', '약국', '서점', '문구점', '가구점', '전자제품'
+      ];
+      
+      shoppingTypes.forEach(type => {
+        if (!existingKeywords.includes(type)) {
+          patterns.push(type);
+        }
+      });
+    }
+    
+    // 여행 관련 패턴
+    if (seedKeyword.includes('여행') || seedKeyword.includes('관광') || seedKeyword.includes('휴가')) {
+      const travelTypes = [
+        '국내여행', '해외여행', '제주여행', '부산여행', '강원여행', '경주여행',
+        '관광지', '명소', '맛집', '숙소', '호텔', '펜션', '게스트하우스', '리조트',
+        '항공권', '기차표', '버스표', '렌터카', '여행사', '패키지여행'
+      ];
+      
+      travelTypes.forEach(type => {
+        if (!existingKeywords.includes(type)) {
+          patterns.push(type);
+        }
+      });
+    }
+    
+    // 일반적인 검색 패턴
+    const commonSuffixes = ['추천', '후기', '리뷰', '가격', '할인', '쿠폰', '이벤트', '정보', '방법', '팁'];
+    const commonPrefixes = ['좋은', '최고의', '인기', '유명한', '저렴한', '고급', '신상', '베스트'];
+    
+    // 기존 키워드에 접미사/접두사 추가
+    existingKeywords.slice(0, 10).forEach(keyword => {
+      commonSuffixes.forEach(suffix => {
+        const newKeyword = `${keyword}${suffix}`;
+        if (!existingKeywords.includes(newKeyword) && !patterns.includes(newKeyword)) {
+          patterns.push(newKeyword);
+        }
+      });
+      
+      commonPrefixes.forEach(prefix => {
+        const newKeyword = `${prefix}${keyword}`;
+        if (!existingKeywords.includes(newKeyword) && !patterns.includes(newKeyword)) {
+          patterns.push(newKeyword);
+        }
+      });
+    });
+    
+    return patterns.slice(0, 100); // 최대 100개 패턴만 반환
+  }
+
+  // API 키 상태 조회
+  getApiKeyStatus() {
+    return this.apiKeyManager.getApiKeyStatus();
+  }
+
+  // 사용 가능한 총 API 호출 수
+  getTotalRemainingCalls(): number {
+    return this.apiKeyManager.getTotalRemainingCalls();
   }
 }
 

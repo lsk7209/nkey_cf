@@ -23,6 +23,27 @@ export default function ManualCollectPage() {
   const [keywords, setKeywords] = useState<KeywordData[]>([])
   const [isCollecting, setIsCollecting] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
+  const [apiKeyStatus, setApiKeyStatus] = useState<any[]>([])
+  const [totalRemainingCalls, setTotalRemainingCalls] = useState(0)
+
+  // API 키 상태 조회
+  const fetchApiKeyStatus = async () => {
+    try {
+      const response = await fetch('/api/api-key-status')
+      if (response.ok) {
+        const data = await response.json()
+        setApiKeyStatus(data.apiKeyStatus || [])
+        setTotalRemainingCalls(data.totalRemainingCalls || 0)
+      }
+    } catch (error) {
+      console.error('API 키 상태 조회 실패:', error)
+    }
+  }
+
+  // 컴포넌트 마운트 시 API 키 상태 조회
+  useEffect(() => {
+    fetchApiKeyStatus()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,6 +113,8 @@ export default function ManualCollectPage() {
     } finally {
       setIsLoading(false)
       setIsCollecting(false)
+      // 수집 완료 후 API 키 상태 새로고침
+      fetchApiKeyStatus()
     }
   }
 
@@ -157,6 +180,46 @@ export default function ManualCollectPage() {
         <p className="text-lg text-gray-600">
           시드키워드를 입력하면 즉시 연관키워드와 상세 지표를 확인할 수 있습니다
         </p>
+      </div>
+
+      {/* API 키 상태 표시 */}
+      <div className="bg-blue-50 rounded-lg shadow p-4 mb-6">
+        <h3 className="text-lg font-semibold text-blue-800 mb-2">API 키 상태</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {apiKeyStatus.map((key, index) => (
+            <div key={index} className="bg-white rounded p-3 border">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-sm">{key.name}</span>
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {key.isActive ? '활성' : '비활성'}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600">
+                <div>사용량: {key.dailyUsage.toLocaleString()} / 25,000</div>
+                <div>남은 호출: {key.remaining.toLocaleString()}</div>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div 
+                  className={`h-2 rounded-full ${
+                    key.remaining > 10000 ? 'bg-green-500' : 
+                    key.remaining > 5000 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${(key.remaining / 25000) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 p-3 bg-white rounded border">
+          <div className="flex justify-between items-center">
+            <span className="font-medium">총 사용 가능한 API 호출</span>
+            <span className="text-lg font-bold text-blue-600">
+              {totalRemainingCalls.toLocaleString()}회
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* 입력 폼 */}
