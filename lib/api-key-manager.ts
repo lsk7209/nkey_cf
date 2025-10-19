@@ -103,7 +103,7 @@ export class ApiKeyManager {
       if (a.dailyUsage !== b.dailyUsage) {
         return a.dailyUsage - b.dailyUsage
       }
-      return a.lastUsed - b.lastUsed
+      return a.lastUsed.getTime() - b.lastUsed.getTime()
     })
 
     // 요청한 개수만큼 반환 (최대 사용 가능한 키 수)
