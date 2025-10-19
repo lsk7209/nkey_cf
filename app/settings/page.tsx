@@ -108,6 +108,31 @@ export default function SettingsPage() {
     }
   }
 
+  // 자동수집 재시작
+  const restartAutoCollect = async () => {
+    try {
+      const response = await fetch('/api/auto-collect-restart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetCount: settings.targetCount }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(data.message || '자동수집이 재시작되었습니다.')
+        fetchAutoCollectStatus()
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.message || '자동수집 재시작에 실패했습니다.')
+      }
+    } catch (error) {
+      setMessage('자동수집 재시작 중 오류가 발생했습니다.')
+      console.error('자동수집 재시작 실패:', error)
+    }
+  }
+
   // 자동수집 시작
   const startAutoCollect = async () => {
     if (!settings.enabled) {
@@ -323,7 +348,7 @@ export default function SettingsPage() {
               </>
             )}
 
-            {/* 자동수집 실행/중단 버튼 */}
+            {/* 자동수집 실행/중단/재시작 버튼 */}
             <div className="flex justify-center space-x-4">
               {autoCollectData?.autoCollectStatus.is_running ? (
                 <button
@@ -343,6 +368,15 @@ export default function SettingsPage() {
                   <span>자동수집 시작</span>
                 </button>
               )}
+              
+              <button
+                onClick={restartAutoCollect}
+                disabled={!settings.enabled}
+                className="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                <Play className="w-5 h-5" />
+                <span>자동수집 재시작</span>
+              </button>
               
               <button
                 onClick={fetchAutoCollectStatus}

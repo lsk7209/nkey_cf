@@ -5,6 +5,9 @@
     },
     "app/api/manual-collect/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/auto-collect/route.ts": {
+      "maxDuration": 300
     }
   }
 }
