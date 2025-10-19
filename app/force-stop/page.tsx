@@ -68,6 +68,48 @@ export default function ForceStopPage() {
     }
   }
 
+  const forceStopDatabase = async () => {
+    setIsLoading(true)
+    setMessage('데이터베이스에서 강제 중단 중...')
+    
+    try {
+      const response = await fetch('/api/force-stop-db', {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(`✅ ${data.message}`)
+        
+        // 2초 후 상태 확인
+        setTimeout(async () => {
+          try {
+            const statusResponse = await fetch('/api/auto-collect-status')
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json()
+              if (statusData.autoCollectStatus.is_running) {
+                setMessage('⚠️ 여전히 실행 중입니다. Supabase에서 직접 SQL을 실행해야 할 수 있습니다.')
+              } else {
+                setMessage('✅ 데이터베이스에서 성공적으로 중단되었습니다.')
+              }
+            }
+          } catch (error) {
+            setMessage('❌ 상태 확인 중 오류가 발생했습니다.')
+          }
+        }, 2000)
+        
+      } else {
+        const errorData = await response.json()
+        setMessage(`❌ 데이터베이스 강제 중단 실패: ${errorData.message || '알 수 없는 오류'}`)
+      }
+    } catch (error) {
+      setMessage('❌ 데이터베이스 강제 중단 중 오류가 발생했습니다.')
+      console.error('데이터베이스 강제 중단 실패:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       {/* 헤더 */}
@@ -105,6 +147,15 @@ export default function ForceStopPage() {
           >
             <XCircle className="w-6 h-6" />
             <span>{isLoading ? '처리 중...' : '자동수집 강제 중단'}</span>
+          </button>
+          
+          <button
+            onClick={forceStopDatabase}
+            disabled={isLoading}
+            className="w-full px-8 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-lg font-medium"
+          >
+            <AlertTriangle className="w-6 h-6" />
+            <span>{isLoading ? '처리 중...' : '데이터베이스에서 강제 중단'}</span>
           </button>
           
           <button
