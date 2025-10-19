@@ -3,6 +3,22 @@ import { NaverKeywordAPI } from '@/lib/naver-api'
 import { NaverDocumentAPI } from '@/lib/naver-document-api'
 import { supabase } from '@/lib/supabase'
 
+// 자동수집 상태 업데이트 함수
+async function updateAutoCollectStatus(updates: any) {
+  try {
+    const { error } = await supabase
+      .from('auto_collect_status')
+      .update(updates)
+      .eq('id', 1)
+    
+    if (error) {
+      console.error('자동수집 상태 업데이트 실패:', error)
+    }
+  } catch (error) {
+    console.error('자동수집 상태 업데이트 중 오류:', error)
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -15,17 +31,77 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const naverAPI = new NaverKeywordAPI()
-    const documentAPI = new NaverDocumentAPI()
+    // 기존 자동수집이 실행 중인지 확인
+    const { data: existingStatus } = await supabase
+      .from('auto_collect_status')
+      .select('is_running')
+      .eq('id', 1)
+      .single()
 
-    // 🚀 자동수집 시작
-    const startTime = Date.now()
-    console.log(`🤖 자동수집 시작: 목표 ${targetCount}개 키워드 (${new Date().toISOString()})`)
-    
-    let totalCollected = 0
-    let totalSaved = 0
-    let batchNumber = 1
+    if (existingStatus?.is_running) {
+      return NextResponse.json(
+        { message: '자동수집이 이미 실행 중입니다.' },
+        { status: 409 }
+      )
+    }
 
+    // 자동수집 상태를 시작으로 업데이트
+    const { error: statusError } = await supabase
+      .from('auto_collect_status')
+      .update({
+        is_running: true,
+        target_count: targetCount,
+        current_count: 0,
+        seeds_used: 0,
+        start_time: new Date().toISOString(),
+        end_time: null,
+        status_message: '자동수집 시작 중...',
+        error_message: null
+      })
+      .eq('id', 1)
+
+    if (statusError) {
+      console.error('자동수집 상태 업데이트 실패:', statusError)
+      return NextResponse.json(
+        { message: '자동수집 상태 업데이트에 실패했습니다.' },
+        { status: 500 }
+      )
+    }
+
+    // 백그라운드에서 자동수집 실행 (응답을 먼저 반환)
+    executeAutoCollect(targetCount)
+
+    return NextResponse.json({
+      message: '자동수집이 백그라운드에서 시작되었습니다.',
+      targetCount
+    })
+
+  } catch (error: any) {
+    console.error('자동수집 API 오류:', error)
+    return NextResponse.json(
+      {
+        message: '자동수집 시작 중 오류가 발생했습니다.',
+        error: error?.message || String(error)
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// 백그라운드에서 실행되는 자동수집 함수
+async function executeAutoCollect(targetCount: number) {
+  const naverAPI = new NaverKeywordAPI()
+  const documentAPI = new NaverDocumentAPI()
+
+  // 🚀 자동수집 시작
+  const startTime = Date.now()
+  console.log(`🤖 자동수집 시작: 목표 ${targetCount}개 키워드 (${new Date().toISOString()})`)
+  
+  let totalCollected = 0
+  let totalSaved = 0
+  let batchNumber = 1
+
+  try {
     // 기존에 수집된 키워드 중 시드활용되지 않은 키워드들을 가져오기
     const { data: unusedKeywords, error: fetchError } = await supabase
       .from('manual_collection_results')
@@ -36,26 +112,43 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       console.error('시드키워드 조회 오류:', fetchError)
-      return NextResponse.json(
-        { message: '시드키워드 조회에 실패했습니다.', error: fetchError.message },
-        { status: 500 }
-      )
+      await updateAutoCollectStatus({
+        is_running: false,
+        end_time: new Date().toISOString(),
+        status_message: '시드키워드 조회 실패',
+        error_message: fetchError.message
+      })
+      return
     }
 
     if (!unusedKeywords || unusedKeywords.length === 0) {
-      return NextResponse.json(
-        { message: '시드키워드로 활용할 수 있는 키워드가 없습니다.' },
-        { status: 200 }
-      )
+      await updateAutoCollectStatus({
+        is_running: false,
+        end_time: new Date().toISOString(),
+        status_message: '시드키워드로 활용할 수 있는 키워드가 없습니다.'
+      })
+      return
     }
 
     console.log(`📋 시드키워드 후보: ${unusedKeywords.length}개`)
+
+    // 자동수집 시작 상태 업데이트
+    await updateAutoCollectStatus({
+      status_message: `시드키워드 ${unusedKeywords.length}개로 자동수집 시작`
+    })
 
     // 시드키워드들을 순차적으로 활용하여 자동수집
     for (let i = 0; i < unusedKeywords.length && totalCollected < targetCount; i++) {
       const seedKeyword = unusedKeywords[i]
       
       console.log(`🌱 배치 ${batchNumber}: "${seedKeyword.keyword}" 시드키워드로 수집 시작`)
+      
+      // 현재 진행 상태 업데이트
+      await updateAutoCollectStatus({
+        status_message: `"${seedKeyword.keyword}" 시드키워드로 수집 중... (${totalCollected}/${targetCount})`,
+        current_count: totalCollected,
+        seeds_used: batchNumber - 1
+      })
       
       try {
         // 1. 연관키워드 수집
@@ -177,23 +270,24 @@ export async function POST(request: NextRequest) {
     console.log(`⏱️ 총 처리 시간: ${totalTime.toFixed(2)}초`)
     console.log(`🌱 활용된 시드키워드: ${batchNumber - 1}개`)
 
-    return NextResponse.json({
-      message: '자동수집 완료',
-      totalCollected,
-      totalSaved,
-      seedsUsed: batchNumber - 1,
-      totalTime: totalTime.toFixed(2),
-      successRate: totalCollected > 0 ? ((totalSaved / totalCollected) * 100).toFixed(1) : 0
+    // 자동수집 완료 상태 업데이트
+    await updateAutoCollectStatus({
+      is_running: false,
+      end_time: new Date().toISOString(),
+      current_count: totalCollected,
+      seeds_used: batchNumber - 1,
+      status_message: `자동수집 완료! ${totalSaved}개 키워드 수집됨 (${totalTime.toFixed(2)}초)`
     })
 
   } catch (error: any) {
-    console.error('자동수집 API 오류:', error)
-    return NextResponse.json(
-      {
-        message: '자동수집 중 오류가 발생했습니다.',
-        error: error?.message || String(error)
-      },
-      { status: 500 }
-    )
+    console.error('자동수집 실행 중 오류:', error)
+    
+    // 오류 상태 업데이트
+    await updateAutoCollectStatus({
+      is_running: false,
+      end_time: new Date().toISOString(),
+      status_message: '자동수집 중 오류 발생',
+      error_message: error?.message || String(error)
+    })
   }
 }

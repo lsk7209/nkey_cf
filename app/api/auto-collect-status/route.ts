@@ -3,10 +3,15 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // 자동수집 설정 조회
-    const autoCollectSettings = {
-      enabled: false,
-      targetCount: 1000
+    // 자동수집 상태 조회
+    const { data: autoCollectStatus, error: statusError } = await supabase
+      .from('auto_collect_status')
+      .select('*')
+      .eq('id', 1)
+      .single()
+
+    if (statusError) {
+      console.error('자동수집 상태 조회 오류:', statusError)
     }
 
     // 시드키워드로 활용 가능한 키워드 수 조회
@@ -39,7 +44,14 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      settings: autoCollectSettings,
+      autoCollectStatus: autoCollectStatus || {
+        is_running: false,
+        target_count: 1000,
+        current_count: 0,
+        seeds_used: 0,
+        status_message: '대기 중',
+        error_message: null
+      },
       statistics: {
         totalKeywords: totalKeywords || 0,
         availableSeeds: availableSeeds || 0,

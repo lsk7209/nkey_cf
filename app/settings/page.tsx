@@ -9,7 +9,18 @@ interface AutoCollectSettings {
 }
 
 interface AutoCollectStatus {
-  settings: AutoCollectSettings
+  is_running: boolean
+  target_count: number
+  current_count: number
+  seeds_used: number
+  start_time: string | null
+  end_time: string | null
+  status_message: string
+  error_message: string | null
+}
+
+interface AutoCollectData {
+  autoCollectStatus: AutoCollectStatus
   statistics: {
     totalKeywords: number
     availableSeeds: number
@@ -25,9 +36,8 @@ export default function SettingsPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [autoCollectStatus, setAutoCollectStatus] = useState<AutoCollectStatus | null>(null)
-  const [isAutoCollecting, setIsAutoCollecting] = useState(false)
-  const [autoCollectProgress, setAutoCollectProgress] = useState({ current: 0, total: 0 })
+  const [autoCollectData, setAutoCollectData] = useState<AutoCollectData | null>(null)
+  const [isLoadingStatus, setIsLoadingStatus] = useState(false)
 
   // 설정 로드
   useEffect(() => {
@@ -45,16 +55,56 @@ export default function SettingsPage() {
     fetchAutoCollectStatus()
   }, [])
 
+  // 자동수집이 실행 중일 때 5초마다 상태 새로고침
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+    
+    if (autoCollectData?.autoCollectStatus.is_running) {
+      interval = setInterval(() => {
+        fetchAutoCollectStatus()
+      }, 5000) // 5초마다 새로고침
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
+    }
+  }, [autoCollectData?.autoCollectStatus.is_running])
+
   // 자동수집 상태 조회
   const fetchAutoCollectStatus = async () => {
+    setIsLoadingStatus(true)
     try {
       const response = await fetch('/api/auto-collect-status')
       if (response.ok) {
         const data = await response.json()
-        setAutoCollectStatus(data)
+        setAutoCollectData(data)
       }
     } catch (error) {
       console.error('자동수집 상태 조회 실패:', error)
+    } finally {
+      setIsLoadingStatus(false)
+    }
+  }
+
+  // 자동수집 중단
+  const stopAutoCollect = async () => {
+    try {
+      const response = await fetch('/api/auto-collect-stop', {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        setMessage('자동수집이 중단되었습니다.')
+        fetchAutoCollectStatus()
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.message || '자동수집 중단에 실패했습니다.')
+      }
+    } catch (error) {
+      setMessage('자동수집 중단 중 오류가 발생했습니다.')
+      console.error('자동수집 중단 실패:', error)
     }
   }
 
@@ -65,9 +115,7 @@ export default function SettingsPage() {
       return
     }
 
-    setIsAutoCollecting(true)
     setMessage('')
-    setAutoCollectProgress({ current: 0, total: settings.targetCount })
 
     try {
       const response = await fetch('/api/auto-collect', {
@@ -84,7 +132,7 @@ export default function SettingsPage() {
       }
 
       const data = await response.json()
-      setMessage(`자동수집 완료! ${data.totalSaved}개 키워드가 수집되었습니다.`)
+      setMessage(data.message || '자동수집이 백그라운드에서 시작되었습니다.')
       
       // 상태 새로고침
       fetchAutoCollectStatus()
@@ -92,9 +140,6 @@ export default function SettingsPage() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '자동수집 중 오류가 발생했습니다.')
       console.error('자동수집 실패:', error)
-    } finally {
-      setIsAutoCollecting(false)
-      setAutoCollectProgress({ current: 0, total: 0 })
     }
   }
 
@@ -216,67 +261,98 @@ export default function SettingsPage() {
 
           <div className="space-y-6">
             {/* 자동수집 상태 */}
-            {autoCollectStatus && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{autoCollectStatus.statistics.totalKeywords.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">전체 키워드</div>
+            {autoCollectData && (
+              <>
+                {/* 통계 정보 */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{autoCollectData.statistics.totalKeywords.toLocaleString()}</div>
+                    <div className="text-sm text-gray-600">전체 키워드</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{autoCollectData.statistics.availableSeeds.toLocaleString()}</div>
+                    <div className="text-sm text-gray-600">시드키워드 후보</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">{autoCollectData.statistics.usedSeeds.toLocaleString()}</div>
+                    <div className="text-sm text-gray-600">활용된 시드</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">{autoCollectData.statistics.usageRate}%</div>
+                    <div className="text-sm text-gray-600">활용률</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{autoCollectStatus.statistics.availableSeeds.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">시드키워드 후보</div>
+
+                {/* 자동수집 실행 상태 */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-blue-900">자동수집 상태</h4>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      autoCollectData.autoCollectStatus.is_running 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {autoCollectData.autoCollectStatus.is_running ? '실행 중' : '대기 중'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-blue-800 mb-2">
+                    {autoCollectData.autoCollectStatus.status_message}
+                  </p>
+                  {autoCollectData.autoCollectStatus.is_running && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>진행률: {autoCollectData.autoCollectStatus.current_count} / {autoCollectData.autoCollectStatus.target_count}</span>
+                        <span>{autoCollectData.autoCollectStatus.seeds_used}개 시드 활용</span>
+                      </div>
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${autoCollectData.autoCollectStatus.target_count > 0 ? (autoCollectData.autoCollectStatus.current_count / autoCollectData.autoCollectStatus.target_count) * 100 : 0}%` 
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  {autoCollectData.autoCollectStatus.error_message && (
+                    <p className="text-sm text-red-600 mt-2">
+                      오류: {autoCollectData.autoCollectStatus.error_message}
+                    </p>
+                  )}
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{autoCollectStatus.statistics.usedSeeds.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">활용된 시드</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{autoCollectStatus.statistics.usageRate}%</div>
-                  <div className="text-sm text-gray-600">활용률</div>
-                </div>
-              </div>
+              </>
             )}
 
-            {/* 자동수집 실행 버튼 */}
-            <div className="flex justify-center">
+            {/* 자동수집 실행/중단 버튼 */}
+            <div className="flex justify-center space-x-4">
+              {autoCollectData?.autoCollectStatus.is_running ? (
+                <button
+                  onClick={stopAutoCollect}
+                  className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center space-x-2"
+                >
+                  <Pause className="w-5 h-5" />
+                  <span>자동수집 중단</span>
+                </button>
+              ) : (
+                <button
+                  onClick={startAutoCollect}
+                  disabled={!settings.enabled}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  <Play className="w-5 h-5" />
+                  <span>자동수집 시작</span>
+                </button>
+              )}
+              
               <button
-                onClick={startAutoCollect}
-                disabled={isAutoCollecting || !settings.enabled}
-                className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                onClick={fetchAutoCollectStatus}
+                disabled={isLoadingStatus}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                {isAutoCollecting ? (
-                  <>
-                    <Pause className="w-5 h-5" />
-                    <span>자동수집 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5" />
-                    <span>자동수집 시작</span>
-                  </>
-                )}
+                <BarChart3 className="w-5 h-5" />
+                <span>{isLoadingStatus ? '새로고침 중...' : '상태 새로고침'}</span>
               </button>
             </div>
-
-            {/* 진행률 표시 */}
-            {isAutoCollecting && (
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-blue-900">자동수집 진행률</span>
-                  <span className="text-sm text-blue-700">
-                    {autoCollectProgress.current} / {autoCollectProgress.total}
-                  </span>
-                </div>
-                <div className="w-full bg-blue-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${autoCollectProgress.total > 0 ? (autoCollectProgress.current / autoCollectProgress.total) * 100 : 0}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
