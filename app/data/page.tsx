@@ -19,6 +19,7 @@ interface KeywordData {
   news_count: number
   webkr_count: number
   cafe_count: number
+  is_used_as_seed: boolean
   created_at: string
 }
 
@@ -168,7 +169,7 @@ export default function DataPage() {
   const exportToCSV = () => {
     if (data.length === 0) return
 
-    const headers = ['키워드', 'PC 검색량', '모바일 검색량', '총 검색량', '카페문서수', '블로그문서수', '웹문서수', '뉴스문서수', 'PC CTR', '모바일 CTR', '광고수', '경쟁지수', '수집일시']
+    const headers = ['키워드', 'PC 검색량', '모바일 검색량', '총 검색량', '카페문서수', '블로그문서수', '웹문서수', '뉴스문서수', 'PC CTR', '모바일 CTR', '광고수', '경쟁지수', '시드활용', '수집일시']
     
     const escapeCSVField = (field: any): string => {
       const str = String(field || '')
@@ -193,6 +194,7 @@ export default function DataPage() {
         escapeCSVField(item.ctr_mobile),
         escapeCSVField(item.ad_count),
         escapeCSVField(item.comp_idx),
+        escapeCSVField(item.is_used_as_seed ? '활용' : '미활용'),
         escapeCSVField(new Date(item.created_at).toLocaleString('ko-KR'))
       ].join(','))
     ].join('\n')
@@ -537,6 +539,9 @@ export default function DataPage() {
                       경쟁지수
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      시드활용
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       수집일시
                     </th>
                   </tr>
@@ -584,6 +589,13 @@ export default function DataPage() {
                           'bg-green-100 text-green-800'
                         }`}>
                           {item.comp_idx}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          item.is_used_as_seed ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.is_used_as_seed ? '활용' : '미활용'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

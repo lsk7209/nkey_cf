@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
             news_count: detail.news_count || 0,
             webkr_count: detail.webkr_count || 0,
             cafe_count: detail.cafe_count || 0,
+            is_used_as_seed: false, // 수동수집으로 수집된 키워드는 기본적으로 미활용
             raw_json: detail.raw_json,
             fetched_at: detail.fetched_at
           }));

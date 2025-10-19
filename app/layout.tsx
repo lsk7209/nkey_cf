@@ -36,6 +36,9 @@ export default function RootLayout({
                       <a href="/data" className="text-gray-600 hover:text-gray-900">
                         데이터
                       </a>
+                      <a href="/settings" className="text-gray-600 hover:text-gray-900">
+                        환경설정
+                      </a>
                     </nav>
               </div>
             </div>
