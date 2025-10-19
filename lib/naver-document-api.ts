@@ -1,3 +1,5 @@
+import { OpenApiKeyManager } from './openapi-key-manager';
+
 interface NaverDocumentResponse {
   lastBuildDate: string
   total: number
@@ -23,16 +25,10 @@ interface DocumentCounts {
 
 export class NaverDocumentAPI {
   private baseUrl = 'https://openapi.naver.com'
-  private clientId: string
-  private clientSecret: string
+  private openApiKeyManager: OpenApiKeyManager
 
   constructor() {
-    this.clientId = process.env.NAVER_CLIENT_ID || ''
-    this.clientSecret = process.env.NAVER_CLIENT_SECRET || ''
-    
-    if (!this.clientId || !this.clientSecret) {
-      console.warn('네이버 OpenAPI 클라이언트 ID 또는 Secret이 설정되지 않았습니다.')
-    }
+    this.openApiKeyManager = new OpenApiKeyManager();
   }
 
   private async searchDocuments(
@@ -40,9 +36,11 @@ export class NaverDocumentAPI {
     service: 'blog' | 'news' | 'webkr' | 'cafearticle',
     display: number = 1
   ): Promise<number> {
-    if (!this.clientId || !this.clientSecret) {
-      console.warn('네이버 OpenAPI 인증 정보가 없습니다.')
-      return 0
+    // 사용 가능한 API 키 가져오기
+    const apiKeyInfo = this.openApiKeyManager.getAvailableApiKey();
+    if (!apiKeyInfo) {
+      console.warn('사용 가능한 OpenAPI 키가 없습니다.');
+      return 0;
     }
 
     try {
@@ -58,15 +56,20 @@ export class NaverDocumentAPI {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'X-Naver-Client-Id': this.clientId,
-          'X-Naver-Client-Secret': this.clientSecret,
+          'X-Naver-Client-Id': apiKeyInfo.clientId,
+          'X-Naver-Client-Secret': apiKeyInfo.clientSecret,
           'Content-Type': 'application/json'
         }
       })
 
+      // API 사용량 증가
+      this.openApiKeyManager.incrementUsage(apiKeyInfo.id);
+
       if (response.status === 429) {
-        console.warn('네이버 API 호출 한도 초과')
-        return 0
+        // 해당 API 키 비활성화
+        this.openApiKeyManager.deactivateApiKey(apiKeyInfo.id);
+        console.warn(`OpenAPI 키 ${apiKeyInfo.name} 호출 한도 초과`);
+        return 0;
       }
 
       if (!response.ok) {
@@ -131,5 +134,15 @@ export class NaverDocumentAPI {
     }
 
     return results
+  }
+
+  // OpenAPI 키 상태 조회
+  getOpenApiKeyStatus() {
+    return this.openApiKeyManager.getApiKeyStatus();
+  }
+
+  // 총 사용 가능한 OpenAPI 호출 수
+  getTotalRemainingOpenApiCalls() {
+    return this.openApiKeyManager.getTotalRemainingCalls();
   }
 }

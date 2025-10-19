@@ -25,6 +25,8 @@ export default function ManualCollectPage() {
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [apiKeyStatus, setApiKeyStatus] = useState<any[]>([])
   const [totalRemainingCalls, setTotalRemainingCalls] = useState(0)
+  const [openApiKeyStatus, setOpenApiKeyStatus] = useState<any[]>([])
+  const [totalRemainingOpenApiCalls, setTotalRemainingOpenApiCalls] = useState(0)
 
   // API 키 상태 조회
   const fetchApiKeyStatus = async () => {
@@ -40,9 +42,24 @@ export default function ManualCollectPage() {
     }
   }
 
+  // OpenAPI 키 상태 조회
+  const fetchOpenApiKeyStatus = async () => {
+    try {
+      const response = await fetch('/api/openapi-key-status')
+      if (response.ok) {
+        const data = await response.json()
+        setOpenApiKeyStatus(data.openApiKeyStatus || [])
+        setTotalRemainingOpenApiCalls(data.totalRemainingOpenApiCalls || 0)
+      }
+    } catch (error) {
+      console.error('OpenAPI 키 상태 조회 실패:', error)
+    }
+  }
+
   // 컴포넌트 마운트 시 API 키 상태 조회
   useEffect(() => {
     fetchApiKeyStatus()
+    fetchOpenApiKeyStatus()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,6 +132,7 @@ export default function ManualCollectPage() {
       setIsCollecting(false)
       // 수집 완료 후 API 키 상태 새로고침
       fetchApiKeyStatus()
+      fetchOpenApiKeyStatus()
     }
   }
 
@@ -217,6 +235,46 @@ export default function ManualCollectPage() {
             <span className="font-medium">총 사용 가능한 API 호출</span>
             <span className="text-lg font-bold text-blue-600">
               {totalRemainingCalls.toLocaleString()}회
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* OpenAPI 키 상태 표시 */}
+      <div className="bg-green-50 rounded-lg shadow p-4 mb-6">
+        <h3 className="text-lg font-semibold text-green-800 mb-2">OpenAPI 키 상태 (문서수 수집용)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {openApiKeyStatus.map((key, index) => (
+            <div key={index} className="bg-white rounded p-3 border">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-sm">{key.name}</span>
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {key.isActive ? '활성' : '비활성'}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600">
+                <div>사용량: {key.dailyUsage.toLocaleString()} / 25,000</div>
+                <div>남은 호출: {key.remaining.toLocaleString()}</div>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div 
+                  className={`h-2 rounded-full ${
+                    key.remaining > 10000 ? 'bg-green-500' : 
+                    key.remaining > 5000 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${(key.remaining / 25000) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 p-3 bg-white rounded border">
+          <div className="flex justify-between items-center">
+            <span className="font-medium">총 사용 가능한 OpenAPI 호출</span>
+            <span className="text-lg font-bold text-green-600">
+              {totalRemainingOpenApiCalls.toLocaleString()}회
             </span>
           </div>
         </div>
