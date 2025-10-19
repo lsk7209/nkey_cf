@@ -213,67 +213,80 @@ export class NaverKeywordAPI {
       primaryKeywords.forEach(k => allKeywords.add(k.keyword));
       console.log(`1차 수집: ${allKeywords.size}개 키워드`);
       
-      // 2차: 수집된 키워드들을 다시 힌트로 사용하여 추가 키워드 수집 (병렬 처리)
-      if (allKeywords.size > 0) {
+      // API 키 상태 확인
+      const availableKeys = this.apiKeyManager.getApiKeyStatus().filter(key => key.isActive);
+      console.log(`사용 가능한 API 키: ${availableKeys.length}개`);
+      
+      if (availableKeys.length === 0) {
+        console.warn('사용 가능한 API 키가 없어 추가 수집을 중단합니다.');
+        return Array.from(allKeywords);
+      }
+      
+      // 2차: 수집된 키워드들을 다시 힌트로 사용하여 추가 키워드 수집 (순차 처리)
+      if (allKeywords.size > 0 && availableKeys.length > 0) {
         const batchSize = 5; // API 제한에 맞춰 5개씩 처리
         const keywordsArray = Array.from(allKeywords);
-        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 20); // 최대 20개 배치
+        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 10); // 최대 10개 배치로 제한
         
-        // 병렬 처리로 배치들을 동시에 실행
-        const batchPromises = [];
+        // 순차 처리로 API 한도 보호
         for (let i = 0; i < maxBatches; i++) {
           const batch = keywordsArray.slice(i * batchSize, (i + 1) * batchSize);
           if (batch.length > 0) {
-            batchPromises.push(
-              this.getKeywords(batch, false)
-                .then(batchKeywords => {
-                  batchKeywords.forEach(k => {
-                    if (k.keyword !== seedKeyword) {
-                      allKeywords.add(k.keyword);
-                    }
-                  });
-                })
-                .catch(error => {
-                  console.error(`배치 ${i} 수집 실패:`, error);
-                })
-            );
+            try {
+              const batchKeywords = await this.getKeywords(batch, false);
+              batchKeywords.forEach(k => {
+                if (k.keyword !== seedKeyword) {
+                  allKeywords.add(k.keyword);
+                }
+              });
+              console.log(`2차 배치 ${i + 1}/${maxBatches} 완료: ${allKeywords.size}개 키워드`);
+              
+              // API 호출 간격 조절 (300ms 대기)
+              await new Promise(resolve => setTimeout(resolve, 300));
+            } catch (error) {
+              console.error(`2차 배치 ${i + 1} 수집 실패:`, error);
+              // API 키 한도 초과 시 중단
+              if (error instanceof Error && error.message.includes('한도 초과')) {
+                console.warn('API 키 한도 초과로 2차 수집을 중단합니다.');
+                break;
+              }
+            }
           }
         }
-        
-        // 모든 배치가 완료될 때까지 대기
-        await Promise.all(batchPromises);
         console.log(`2차 수집 후 총 ${allKeywords.size}개 키워드`);
       }
       
-      // 3차: 2차에서 수집된 키워드들로 추가 수집 (병렬 처리)
-      if (allKeywords.size > 0) {
+      // 3차: 2차에서 수집된 키워드들로 추가 수집 (순차 처리, 더 보수적)
+      if (allKeywords.size > 0 && availableKeys.length > 1) {
         const keywordsArray = Array.from(allKeywords);
         const batchSize = 5;
-        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 40); // 최대 40개 배치
+        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 5); // 최대 5개 배치로 제한
         
-        // 병렬 처리로 배치들을 동시에 실행
-        const batchPromises = [];
+        // 순차 처리로 API 한도 보호
         for (let i = 0; i < maxBatches; i++) {
           const batch = keywordsArray.slice(i * batchSize, (i + 1) * batchSize);
           if (batch.length > 0) {
-            batchPromises.push(
-              this.getKeywords(batch, false)
-                .then(batchKeywords => {
-                  batchKeywords.forEach(k => {
-                    if (k.keyword !== seedKeyword) {
-                      allKeywords.add(k.keyword);
-                    }
-                  });
-                })
-                .catch(error => {
-                  console.error(`3차 배치 ${i} 수집 실패:`, error);
-                })
-            );
+            try {
+              const batchKeywords = await this.getKeywords(batch, false);
+              batchKeywords.forEach(k => {
+                if (k.keyword !== seedKeyword) {
+                  allKeywords.add(k.keyword);
+                }
+              });
+              console.log(`3차 배치 ${i + 1}/${maxBatches} 완료: ${allKeywords.size}개 키워드`);
+              
+              // API 호출 간격 조절 (500ms 대기)
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (error) {
+              console.error(`3차 배치 ${i + 1} 수집 실패:`, error);
+              // API 키 한도 초과 시 중단
+              if (error instanceof Error && error.message.includes('한도 초과')) {
+                console.warn('API 키 한도 초과로 3차 수집을 중단합니다.');
+                break;
+              }
+            }
           }
         }
-        
-        // 모든 배치가 완료될 때까지 대기
-        await Promise.all(batchPromises);
         console.log(`3차 수집 후 총 ${allKeywords.size}개 키워드`);
       }
       
