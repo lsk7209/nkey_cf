@@ -45,6 +45,9 @@ export default function RootLayout({
                       <a href="/settings" className="text-gray-600 hover:text-gray-900">
                         환경설정
                       </a>
+                      <a href="/force-stop" className="text-red-600 hover:text-red-900 font-medium">
+                        강제중단
+                      </a>
                     </nav>
               </div>
             </div>
