@@ -73,9 +73,11 @@ export async function POST(request: NextRequest) {
     setTimeout(async () => {
       try {
         console.log('🚀 백그라운드 자동수집 시작:', targetCount)
+        console.log('📋 executeAutoCollect 함수 호출 시작')
         await executeAutoCollect(targetCount)
+        console.log('✅ executeAutoCollect 함수 완료')
       } catch (error) {
-        console.error('백그라운드 자동수집 실행 오류:', error)
+        console.error('❌ 백그라운드 자동수집 실행 오류:', error)
         await updateAutoCollectStatus({
           is_running: false,
           end_time: new Date().toISOString(),
@@ -117,12 +119,15 @@ async function executeAutoCollect(targetCount: number) {
 
   try {
     // 기존에 수집된 키워드 중 시드활용되지 않은 키워드들을 가져오기
+    console.log('📋 시드키워드 조회 시작...')
     const { data: unusedKeywords, error: fetchError } = await supabase
       .from('manual_collection_results')
       .select('id, keyword, total_search')
       .eq('is_used_as_seed', false)
       .order('total_search', { ascending: false })
-      .limit(1000) // 최대 1000개까지 시드키워드로 활용
+      .limit(1000)
+    
+    console.log('📋 시드키워드 조회 완료:', unusedKeywords?.length || 0, '개') // 최대 1000개까지 시드키워드로 활용
 
     if (fetchError) {
       console.error('시드키워드 조회 오류:', fetchError)
