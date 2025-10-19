@@ -215,35 +215,16 @@ export default function ManualCollectPage() {
         </p>
       </div>
 
-      {/* API 키 상태 간단 표시 */}
-      <div className="bg-gray-50 rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 검색광고 API */}
-          <div className="bg-white rounded p-4 border">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-blue-800">🔍 검색광고 API</h3>
-              <span className="text-sm text-gray-600">
-                활성: {apiKeyStatus.filter(k => k.isActive).length}/{apiKeyStatus.length}개
-              </span>
-            </div>
-            <div className="text-2xl font-bold text-blue-600">
-              {totalRemainingCalls.toLocaleString()}회
-            </div>
-            <div className="text-sm text-gray-500">사용 가능</div>
+      {/* API 키 상태 초간단 표시 */}
+      <div className="bg-blue-50 rounded-lg p-3 mb-6">
+        <div className="flex items-center justify-center space-x-8 text-sm">
+          <div className="flex items-center space-x-2">
+            <span className="text-blue-600 font-medium">🔍 검색광고:</span>
+            <span className="font-bold text-blue-800">{totalRemainingCalls.toLocaleString()}회</span>
           </div>
-
-          {/* OpenAPI */}
-          <div className="bg-white rounded p-4 border">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-green-800">📄 OpenAPI</h3>
-              <span className="text-sm text-gray-600">
-                활성: {openApiKeyStatus.filter(k => k.isActive).length}/{openApiKeyStatus.length}개
-              </span>
-            </div>
-            <div className="text-2xl font-bold text-green-600">
-              {totalRemainingOpenApiCalls.toLocaleString()}회
-            </div>
-            <div className="text-sm text-gray-500">사용 가능</div>
+          <div className="flex items-center space-x-2">
+            <span className="text-green-600 font-medium">📄 OpenAPI:</span>
+            <span className="font-bold text-green-800">{totalRemainingOpenApiCalls.toLocaleString()}회</span>
           </div>
         </div>
       </div>
