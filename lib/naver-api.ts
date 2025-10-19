@@ -403,7 +403,6 @@ export class NaverKeywordAPI {
         const response = await fetch(url, {
           method: 'GET',
           headers,
-          timeout: 10000, // 10초 타임아웃
         });
 
         // API 사용량 증가
