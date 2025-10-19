@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '100')
     const search = searchParams.get('search') || ''
-    const sortBy = searchParams.get('sortBy') || 'total_search'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const sortBy = searchParams.get('sortBy') || 'cafe_count'
+    const sortOrder = searchParams.get('sortOrder') || 'asc'
     const seedKeyword = searchParams.get('seedKeyword') || ''
 
     // 페이지네이션 계산
@@ -30,13 +30,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 정렬 추가
-    const validSortColumns = ['total_search', 'pc_search', 'mobile_search', 'created_at', 'keyword']
+    const validSortColumns = ['total_search', 'pc_search', 'mobile_search', 'created_at', 'keyword', 'cafe_count', 'blog_count', 'news_count', 'webkr_count']
     const validSortOrders = ['asc', 'desc']
     
     if (validSortColumns.includes(sortBy) && validSortOrders.includes(sortOrder)) {
       query = query.order(sortBy, { ascending: sortOrder === 'asc' })
     } else {
-      query = query.order('total_search', { ascending: false })
+      query = query.order('cafe_count', { ascending: true })
     }
 
     // 페이지네이션 적용

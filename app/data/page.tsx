@@ -47,8 +47,8 @@ export default function DataPage() {
   // 필터 상태
   const [search, setSearch] = useState('')
   const [seedKeyword, setSeedKeyword] = useState('')
-  const [sortBy, setSortBy] = useState('total_search')
-  const [sortOrder, setSortOrder] = useState('desc')
+  const [sortBy, setSortBy] = useState('cafe_count')
+  const [sortOrder, setSortOrder] = useState('asc')
   const [seedKeywords, setSeedKeywords] = useState<string[]>([])
 
   // 데이터 로드
@@ -273,6 +273,10 @@ export default function DataPage() {
               onChange={(e) => setSortBy(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="cafe_count">카페문서수</option>
+              <option value="blog_count">블로그문서수</option>
+              <option value="news_count">뉴스문서수</option>
+              <option value="webkr_count">웹문서수</option>
               <option value="total_search">총 검색량</option>
               <option value="pc_search">PC 검색량</option>
               <option value="mobile_search">모바일 검색량</option>
