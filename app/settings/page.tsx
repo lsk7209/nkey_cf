@@ -38,6 +38,9 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('')
   const [autoCollectData, setAutoCollectData] = useState<AutoCollectData | null>(null)
   const [isLoadingStatus, setIsLoadingStatus] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
+  const [isRestarting, setIsRestarting] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
 
   // 설정 로드
   useEffect(() => {
@@ -90,26 +93,34 @@ export default function SettingsPage() {
 
   // 자동수집 중단
   const stopAutoCollect = async () => {
+    setIsStopping(true)
+    setMessage('자동수집 중단 중...')
+    
     try {
       const response = await fetch('/api/auto-collect-stop', {
         method: 'POST'
       })
 
       if (response.ok) {
-        setMessage('자동수집이 중단되었습니다.')
+        setMessage('✅ 자동수집이 중단되었습니다.')
         fetchAutoCollectStatus()
       } else {
         const errorData = await response.json()
-        setMessage(errorData.message || '자동수집 중단에 실패했습니다.')
+        setMessage(`❌ 자동수집 중단 실패: ${errorData.message || '알 수 없는 오류'}`)
       }
     } catch (error) {
-      setMessage('자동수집 중단 중 오류가 발생했습니다.')
+      setMessage('❌ 자동수집 중단 중 오류가 발생했습니다.')
       console.error('자동수집 중단 실패:', error)
+    } finally {
+      setIsStopping(false)
     }
   }
 
   // 자동수집 재시작
   const restartAutoCollect = async () => {
+    setIsRestarting(true)
+    setMessage('자동수집 재시작 중...')
+    
     try {
       const response = await fetch('/api/auto-collect-restart', {
         method: 'POST',
@@ -121,26 +132,29 @@ export default function SettingsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setMessage(data.message || '자동수집이 재시작되었습니다.')
+        setMessage(`✅ ${data.message || '자동수집이 재시작되었습니다.'}`)
         fetchAutoCollectStatus()
       } else {
         const errorData = await response.json()
-        setMessage(errorData.message || '자동수집 재시작에 실패했습니다.')
+        setMessage(`❌ 자동수집 재시작 실패: ${errorData.message || '알 수 없는 오류'}`)
       }
     } catch (error) {
-      setMessage('자동수집 재시작 중 오류가 발생했습니다.')
+      setMessage('❌ 자동수집 재시작 중 오류가 발생했습니다.')
       console.error('자동수집 재시작 실패:', error)
+    } finally {
+      setIsRestarting(false)
     }
   }
 
   // 자동수집 시작
   const startAutoCollect = async () => {
     if (!settings.enabled) {
-      setMessage('자동수집이 비활성화되어 있습니다.')
+      setMessage('❌ 자동수집이 비활성화되어 있습니다.')
       return
     }
 
-    setMessage('')
+    setIsStarting(true)
+    setMessage('자동수집 시작 중...')
 
     try {
       const response = await fetch('/api/auto-collect', {
@@ -157,14 +171,16 @@ export default function SettingsPage() {
       }
 
       const data = await response.json()
-      setMessage(data.message || '자동수집이 백그라운드에서 시작되었습니다.')
+      setMessage(`✅ ${data.message || '자동수집이 백그라운드에서 시작되었습니다.'}`)
       
       // 상태 새로고침
       fetchAutoCollectStatus()
       
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '자동수집 중 오류가 발생했습니다.')
+      setMessage(`❌ ${error instanceof Error ? error.message : '자동수집 중 오류가 발생했습니다.'}`)
       console.error('자동수집 실패:', error)
+    } finally {
+      setIsStarting(false)
     }
   }
 
@@ -353,29 +369,30 @@ export default function SettingsPage() {
               {autoCollectData?.autoCollectStatus.is_running ? (
                 <button
                   onClick={stopAutoCollect}
-                  className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center space-x-2"
+                  disabled={isStopping}
+                  className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   <Pause className="w-5 h-5" />
-                  <span>자동수집 중단</span>
+                  <span>{isStopping ? '중단 중...' : '자동수집 중단'}</span>
                 </button>
               ) : (
                 <button
                   onClick={startAutoCollect}
-                  disabled={!settings.enabled}
+                  disabled={!settings.enabled || isStarting}
                   className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   <Play className="w-5 h-5" />
-                  <span>자동수집 시작</span>
+                  <span>{isStarting ? '시작 중...' : '자동수집 시작'}</span>
                 </button>
               )}
               
               <button
                 onClick={restartAutoCollect}
-                disabled={!settings.enabled}
+                disabled={!settings.enabled || isRestarting}
                 className="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 <Play className="w-5 h-5" />
-                <span>자동수집 재시작</span>
+                <span>{isRestarting ? '재시작 중...' : '자동수집 재시작'}</span>
               </button>
               
               <button
