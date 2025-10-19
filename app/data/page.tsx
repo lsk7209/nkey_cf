@@ -50,6 +50,18 @@ export default function DataPage() {
   const [sortBy, setSortBy] = useState('cafe_count')
   const [sortOrder, setSortOrder] = useState('asc')
   const [seedKeywords, setSeedKeywords] = useState<string[]>([])
+  
+  // 범위 필터 상태
+  const [totalSearchMin, setTotalSearchMin] = useState('')
+  const [totalSearchMax, setTotalSearchMax] = useState('')
+  const [cafeCountMin, setCafeCountMin] = useState('')
+  const [cafeCountMax, setCafeCountMax] = useState('')
+  const [blogCountMin, setBlogCountMin] = useState('')
+  const [blogCountMax, setBlogCountMax] = useState('')
+  const [newsCountMin, setNewsCountMin] = useState('')
+  const [newsCountMax, setNewsCountMax] = useState('')
+  const [webkrCountMin, setWebkrCountMin] = useState('')
+  const [webkrCountMax, setWebkrCountMax] = useState('')
 
   // 데이터 로드
   const loadData = async (page: number = 1) => {
@@ -68,6 +80,18 @@ export default function DataPage() {
       if (seedKeyword) {
         params.append('seedKeyword', seedKeyword)
       }
+      
+      // 범위 필터 파라미터 추가
+      if (totalSearchMin) params.append('totalSearchMin', totalSearchMin)
+      if (totalSearchMax) params.append('totalSearchMax', totalSearchMax)
+      if (cafeCountMin) params.append('cafeCountMin', cafeCountMin)
+      if (cafeCountMax) params.append('cafeCountMax', cafeCountMax)
+      if (blogCountMin) params.append('blogCountMin', blogCountMin)
+      if (blogCountMax) params.append('blogCountMax', blogCountMax)
+      if (newsCountMin) params.append('newsCountMin', newsCountMin)
+      if (newsCountMax) params.append('newsCountMax', newsCountMax)
+      if (webkrCountMin) params.append('webkrCountMin', webkrCountMin)
+      if (webkrCountMax) params.append('webkrCountMax', webkrCountMax)
 
       const response = await fetch(`/api/data?${params}`)
       
@@ -106,6 +130,24 @@ export default function DataPage() {
     }
   }
 
+  // 필터 초기화
+  const resetFilters = () => {
+    setSearch('')
+    setSeedKeyword('')
+    setTotalSearchMin('')
+    setTotalSearchMax('')
+    setCafeCountMin('')
+    setCafeCountMax('')
+    setBlogCountMin('')
+    setBlogCountMax('')
+    setNewsCountMin('')
+    setNewsCountMax('')
+    setWebkrCountMin('')
+    setWebkrCountMax('')
+    setSortBy('cafe_count')
+    setSortOrder('asc')
+  }
+
   // 초기 로드
   useEffect(() => {
     loadData()
@@ -115,7 +157,7 @@ export default function DataPage() {
   // 필터 변경 시 데이터 재로드
   useEffect(() => {
     loadData(1)
-  }, [search, seedKeyword, sortBy, sortOrder])
+  }, [search, seedKeyword, sortBy, sortOrder, totalSearchMin, totalSearchMax, cafeCountMin, cafeCountMax, blogCountMin, blogCountMax, newsCountMin, newsCountMax, webkrCountMin, webkrCountMax])
 
   // 페이지 변경
   const handlePageChange = (newPage: number) => {
@@ -297,6 +339,127 @@ export default function DataPage() {
               <option value="desc">내림차순</option>
               <option value="asc">오름차순</option>
             </select>
+          </div>
+        </div>
+        
+        {/* 범위 필터 */}
+        <div className="mt-6">
+          <h3 className="text-md font-medium text-gray-700 mb-3">범위 필터</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 총 검색량 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                총 검색량
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={totalSearchMin}
+                  onChange={(e) => setTotalSearchMin(e.target.value)}
+                  placeholder="최소"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="number"
+                  value={totalSearchMax}
+                  onChange={(e) => setTotalSearchMax(e.target.value)}
+                  placeholder="최대"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            {/* 카페문서수 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                카페문서수
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={cafeCountMin}
+                  onChange={(e) => setCafeCountMin(e.target.value)}
+                  placeholder="최소"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="number"
+                  value={cafeCountMax}
+                  onChange={(e) => setCafeCountMax(e.target.value)}
+                  placeholder="최대"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            {/* 블로그문서수 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                블로그문서수
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={blogCountMin}
+                  onChange={(e) => setBlogCountMin(e.target.value)}
+                  placeholder="최소"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="number"
+                  value={blogCountMax}
+                  onChange={(e) => setBlogCountMax(e.target.value)}
+                  placeholder="최대"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            {/* 뉴스문서수 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                뉴스문서수
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={newsCountMin}
+                  onChange={(e) => setNewsCountMin(e.target.value)}
+                  placeholder="최소"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="number"
+                  value={newsCountMax}
+                  onChange={(e) => setNewsCountMax(e.target.value)}
+                  placeholder="최대"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            {/* 웹문서수 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                웹문서수
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={webkrCountMin}
+                  onChange={(e) => setWebkrCountMin(e.target.value)}
+                  placeholder="최소"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="number"
+                  value={webkrCountMax}
+                  onChange={(e) => setWebkrCountMax(e.target.value)}
+                  placeholder="최대"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
           </div>
         </div>
         

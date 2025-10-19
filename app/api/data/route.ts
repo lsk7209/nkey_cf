@@ -10,6 +10,18 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'cafe_count'
     const sortOrder = searchParams.get('sortOrder') || 'asc'
     const seedKeyword = searchParams.get('seedKeyword') || ''
+    
+    // 범위 필터 파라미터
+    const totalSearchMin = searchParams.get('totalSearchMin')
+    const totalSearchMax = searchParams.get('totalSearchMax')
+    const cafeCountMin = searchParams.get('cafeCountMin')
+    const cafeCountMax = searchParams.get('cafeCountMax')
+    const blogCountMin = searchParams.get('blogCountMin')
+    const blogCountMax = searchParams.get('blogCountMax')
+    const newsCountMin = searchParams.get('newsCountMin')
+    const newsCountMax = searchParams.get('newsCountMax')
+    const webkrCountMin = searchParams.get('webkrCountMin')
+    const webkrCountMax = searchParams.get('webkrCountMax')
 
     // 페이지네이션 계산
     const offset = (page - 1) * limit
@@ -27,6 +39,38 @@ export async function GET(request: NextRequest) {
     // 시드키워드 필터 추가
     if (seedKeyword) {
       query = query.eq('seed_keyword', seedKeyword)
+    }
+
+    // 범위 필터 추가
+    if (totalSearchMin) {
+      query = query.gte('total_search', parseInt(totalSearchMin))
+    }
+    if (totalSearchMax) {
+      query = query.lte('total_search', parseInt(totalSearchMax))
+    }
+    if (cafeCountMin) {
+      query = query.gte('cafe_count', parseInt(cafeCountMin))
+    }
+    if (cafeCountMax) {
+      query = query.lte('cafe_count', parseInt(cafeCountMax))
+    }
+    if (blogCountMin) {
+      query = query.gte('blog_count', parseInt(blogCountMin))
+    }
+    if (blogCountMax) {
+      query = query.lte('blog_count', parseInt(blogCountMax))
+    }
+    if (newsCountMin) {
+      query = query.gte('news_count', parseInt(newsCountMin))
+    }
+    if (newsCountMax) {
+      query = query.lte('news_count', parseInt(newsCountMax))
+    }
+    if (webkrCountMin) {
+      query = query.gte('webkr_count', parseInt(webkrCountMin))
+    }
+    if (webkrCountMax) {
+      query = query.lte('webkr_count', parseInt(webkrCountMax))
     }
 
     // 정렬 추가
