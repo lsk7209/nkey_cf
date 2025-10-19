@@ -191,11 +191,11 @@ async function executeAutoCollectRestart(targetCount: number, naverAPI: any, doc
             const keywordStats = await naverAPI.getBatchKeywordStats(batchKeywords, 10)
             
             // 문서수 수집
-            const keywordsForDocs = keywordStats.map(stat => stat.keyword)
+            const keywordsForDocs = keywordStats.map((stat: any) => stat.keyword)
             const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 5)
             
             // 데이터 통합 및 저장
-            const batchKeywordDetails = keywordStats.map(stat => {
+            const batchKeywordDetails = keywordStats.map((stat: any) => {
               const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 }
               return {
                 ...stat,
@@ -208,7 +208,7 @@ async function executeAutoCollectRestart(targetCount: number, naverAPI: any, doc
             
             // 데이터베이스에 저장
             if (batchKeywordDetails.length > 0) {
-              const insertData = batchKeywordDetails.map(detail => ({
+              const insertData = batchKeywordDetails.map((detail: any) => ({
                 seed_keyword: seedKeyword.keyword,
                 keyword: detail.keyword,
                 pc_search: detail.pc_search,
