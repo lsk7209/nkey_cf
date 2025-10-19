@@ -32,37 +32,66 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 각 연관키워드의 상세 정보 수집
+    // 키워드 수가 많을 경우 배치 처리로 최적화
     const keywordDetails = []
+    const batchSize = 100; // 한 번에 처리할 키워드 수
+    const totalBatches = Math.ceil(relatedKeywords.length / batchSize);
     
-    for (const keyword of relatedKeywords) {
-      try {
-        const details = await naverAPI.getKeywordStats(keyword)
-        if (details) {
-          // 문서수 정보 수집
-          try {
-            const documentCounts = await documentAPI.getDocumentCounts(keyword)
-            // 문서수 정보를 details에 추가
-            const detailsWithDocuments = {
-              ...details,
-              blog_count: documentCounts.blog,
-              news_count: documentCounts.news,
-              webkr_count: documentCounts.webkr,
-              cafe_count: documentCounts.cafe
-            }
-            keywordDetails.push(detailsWithDocuments)
-          } catch (docError) {
-            console.error(`키워드 "${keyword}" 문서수 수집 실패:`, docError)
-            // 문서수 수집 실패해도 기본 정보는 저장
-            keywordDetails.push(details)
-          }
-        }
+    console.log(`총 ${relatedKeywords.length}개 키워드를 ${totalBatches}개 배치로 처리합니다.`);
+    
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startIndex = batchIndex * batchSize;
+      const endIndex = Math.min(startIndex + batchSize, relatedKeywords.length);
+      const batchKeywords = relatedKeywords.slice(startIndex, endIndex);
+      
+      console.log(`배치 ${batchIndex + 1}/${totalBatches} 처리 중: ${batchKeywords.length}개 키워드`);
+      
+      // 배치 내에서 병렬 처리 (최대 20개씩)
+      const parallelSize = 20;
+      for (let i = 0; i < batchKeywords.length; i += parallelSize) {
+        const parallelBatch = batchKeywords.slice(i, i + parallelSize);
         
-        // API 제한을 고려한 대기 (429 에러 방지)
-        await new Promise(resolve => setTimeout(resolve, 300))
-      } catch (error) {
-        console.error(`키워드 "${keyword}" 상세 정보 수집 실패:`, error)
-        // 개별 키워드 실패는 전체를 중단하지 않음
+        const batchPromises = parallelBatch.map(async (keyword) => {
+          try {
+            const details = await naverAPI.getKeywordStats(keyword)
+            if (details) {
+              // 문서수 정보 수집
+              try {
+                const documentCounts = await documentAPI.getDocumentCounts(keyword)
+                return {
+                  ...details,
+                  blog_count: documentCounts.blog,
+                  news_count: documentCounts.news,
+                  webkr_count: documentCounts.webkr,
+                  cafe_count: documentCounts.cafe
+                }
+              } catch (docError) {
+                console.error(`키워드 "${keyword}" 문서수 수집 실패:`, docError)
+                return details
+              }
+            }
+            return null
+          } catch (error) {
+            console.error(`키워드 "${keyword}" 상세 정보 수집 실패:`, error)
+            return null
+          }
+        })
+        
+        const batchResults = await Promise.all(batchPromises)
+        const validResults = batchResults.filter(result => result !== null)
+        keywordDetails.push(...validResults)
+        
+        // 배치 간 대기
+        if (i + parallelSize < batchKeywords.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+      
+      console.log(`배치 ${batchIndex + 1} 완료: ${keywordDetails.length}개 키워드 수집됨`)
+      
+      // 배치 간 대기 (API 부하 분산)
+      if (batchIndex < totalBatches - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
     }
 
