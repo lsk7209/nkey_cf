@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
           is_running: false,
           end_time: new Date().toISOString(),
           status_message: '재시작된 자동수집 실행 중 오류 발생',
-          error_message: error?.message || String(error)
+          error_message: (error as any)?.message || String(error)
         })
       }
     })
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: '자동수집 재시작 중 오류가 발생했습니다.',
-        error: error?.message || String(error)
+        error: (error as any)?.message || String(error)
       },
       { status: 500 }
     )
@@ -310,7 +310,7 @@ async function executeAutoCollectRestart(targetCount: number, naverAPI: any, doc
       is_running: false,
       end_time: new Date().toISOString(),
       status_message: '재시작 자동수집 중 오류 발생',
-      error_message: error?.message || String(error)
+      error_message: (error as any)?.message || String(error)
     })
   }
 }
