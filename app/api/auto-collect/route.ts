@@ -69,16 +69,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 백그라운드에서 자동수집 실행 (응답을 먼저 반환)
-    // Promise.resolve()로 비동기 실행하여 응답을 즉시 반환
-    Promise.resolve().then(() => executeAutoCollect(targetCount)).catch(error => {
-      console.error('백그라운드 자동수집 실행 오류:', error)
-      updateAutoCollectStatus({
-        is_running: false,
-        end_time: new Date().toISOString(),
-        status_message: '백그라운드 실행 중 오류 발생',
-        error_message: error?.message || String(error)
-      })
-    })
+    // setTimeout을 사용하여 응답 후 즉시 실행
+    setTimeout(async () => {
+      try {
+        console.log('🚀 백그라운드 자동수집 시작:', targetCount)
+        await executeAutoCollect(targetCount)
+      } catch (error) {
+        console.error('백그라운드 자동수집 실행 오류:', error)
+        await updateAutoCollectStatus({
+          is_running: false,
+          end_time: new Date().toISOString(),
+          status_message: '백그라운드 실행 중 오류 발생',
+          error_message: (error as any)?.message || String(error)
+        })
+      }
+    }, 100) // 100ms 후 실행
 
     return NextResponse.json({
       message: '자동수집이 백그라운드에서 시작되었습니다.',

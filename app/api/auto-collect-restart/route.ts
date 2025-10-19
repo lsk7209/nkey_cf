@@ -61,8 +61,9 @@ export async function POST(request: NextRequest) {
     const documentAPI = new NaverDocumentAPI()
 
     // 백그라운드에서 자동수집 실행
-    Promise.resolve().then(async () => {
+    setTimeout(async () => {
       try {
+        console.log('🔄 백그라운드 자동수집 재시작:', targetCount)
         await executeAutoCollectRestart(targetCount, naverAPI, documentAPI)
       } catch (error) {
         console.error('재시작된 자동수집 실행 오류:', error)
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
           error_message: (error as any)?.message || String(error)
         })
       }
-    })
+    }, 100) // 100ms 후 실행
 
     return NextResponse.json({
       message: '자동수집이 재시작되었습니다.',
