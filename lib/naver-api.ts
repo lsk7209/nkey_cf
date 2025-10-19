@@ -206,46 +206,78 @@ export class NaverKeywordAPI {
   // 시드키워드로부터 연관키워드 목록 가져오기 (상세 정보 없이)
   async getRelatedKeywords(seedKeyword: string): Promise<string[]> {
     try {
+      const allKeywords = new Set<string>();
+      
       // 1차: 기본 연관키워드 수집
       const primaryKeywords = await this.getKeywords([seedKeyword], false);
-      let allKeywords = primaryKeywords.map(k => k.keyword);
+      primaryKeywords.forEach(k => allKeywords.add(k.keyword));
+      console.log(`1차 수집: ${allKeywords.size}개 키워드`);
       
-      console.log(`1차 수집: ${allKeywords.length}개 키워드`);
-      
-      // 2차: 수집된 키워드들을 다시 힌트로 사용하여 추가 키워드 수집
-      if (allKeywords.length > 0) {
+      // 2차: 수집된 키워드들을 다시 힌트로 사용하여 추가 키워드 수집 (병렬 처리)
+      if (allKeywords.size > 0) {
         const batchSize = 5; // API 제한에 맞춰 5개씩 처리
-        const additionalKeywords = new Set<string>();
+        const keywordsArray = Array.from(allKeywords);
+        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 20); // 최대 20개 배치
         
-        // 기존 키워드들을 5개씩 묶어서 추가 수집
-        for (let i = 0; i < Math.min(allKeywords.length, 10); i += batchSize) {
-          const batch = allKeywords.slice(i, i + batchSize);
-          
-          try {
-            const batchKeywords = await this.getKeywords(batch, false);
-            batchKeywords.forEach(k => {
-              if (k.keyword !== seedKeyword && !allKeywords.includes(k.keyword)) {
-                additionalKeywords.add(k.keyword);
-              }
-            });
-            
-            // API 제한을 고려한 대기
-            await new Promise(resolve => setTimeout(resolve, 200));
-          } catch (error) {
-            console.error(`배치 ${i}-${i + batchSize} 수집 실패:`, error);
+        // 병렬 처리로 배치들을 동시에 실행
+        const batchPromises = [];
+        for (let i = 0; i < maxBatches; i++) {
+          const batch = keywordsArray.slice(i * batchSize, (i + 1) * batchSize);
+          if (batch.length > 0) {
+            batchPromises.push(
+              this.getKeywords(batch, false)
+                .then(batchKeywords => {
+                  batchKeywords.forEach(k => {
+                    if (k.keyword !== seedKeyword) {
+                      allKeywords.add(k.keyword);
+                    }
+                  });
+                })
+                .catch(error => {
+                  console.error(`배치 ${i} 수집 실패:`, error);
+                })
+            );
           }
         }
         
-        allKeywords = [...allKeywords, ...Array.from(additionalKeywords)];
-        console.log(`2차 수집 후 총 ${allKeywords.length}개 키워드`);
+        // 모든 배치가 완료될 때까지 대기
+        await Promise.all(batchPromises);
+        console.log(`2차 수집 후 총 ${allKeywords.size}개 키워드`);
       }
       
-      // 3차: 특정 패턴으로 추가 키워드 생성
-      const additionalPatterns = this.generateKeywordPatterns(seedKeyword, allKeywords);
-      allKeywords = [...allKeywords, ...additionalPatterns];
-      console.log(`3차 패턴 생성 후 총 ${allKeywords.length}개 키워드`);
+      // 3차: 2차에서 수집된 키워드들로 추가 수집 (병렬 처리)
+      if (allKeywords.size > 0) {
+        const keywordsArray = Array.from(allKeywords);
+        const batchSize = 5;
+        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 40); // 최대 40개 배치
+        
+        // 병렬 처리로 배치들을 동시에 실행
+        const batchPromises = [];
+        for (let i = 0; i < maxBatches; i++) {
+          const batch = keywordsArray.slice(i * batchSize, (i + 1) * batchSize);
+          if (batch.length > 0) {
+            batchPromises.push(
+              this.getKeywords(batch, false)
+                .then(batchKeywords => {
+                  batchKeywords.forEach(k => {
+                    if (k.keyword !== seedKeyword) {
+                      allKeywords.add(k.keyword);
+                    }
+                  });
+                })
+                .catch(error => {
+                  console.error(`3차 배치 ${i} 수집 실패:`, error);
+                })
+            );
+          }
+        }
+        
+        // 모든 배치가 완료될 때까지 대기
+        await Promise.all(batchPromises);
+        console.log(`3차 수집 후 총 ${allKeywords.size}개 키워드`);
+      }
       
-      return allKeywords;
+      return Array.from(allKeywords);
     } catch (error) {
       console.error('연관키워드 조회 실패:', error);
       return [];
@@ -263,103 +295,6 @@ export class NaverKeywordAPI {
     }
   }
 
-  // 키워드 패턴 생성 (황금 키워드 수집을 위한 확장)
-  private generateKeywordPatterns(seedKeyword: string, existingKeywords: string[]): string[] {
-    const patterns: string[] = [];
-    
-    // 맛집 관련 패턴
-    if (seedKeyword.includes('맛집') || seedKeyword.includes('음식') || seedKeyword.includes('식당')) {
-      const locations = [
-        '강남', '홍대', '신촌', '이태원', '명동', '동대문', '건대', '성수', '압구정', '청담',
-        '잠실', '송파', '강동', '마포', '서초', '용산', '중구', '종로', '성북', '노원',
-        '은평', '서대문', '동대문구', '성동', '광진', '중랑', '강북', '도봉', '관악', '금천',
-        '영등포', '양천', '구로', '동작', '강서', '강남구', '송파구', '마포구', '서초구', '용산구',
-        '서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원',
-        '충북', '충남', '전북', '전남', '경북', '경남', '제주'
-      ];
-      
-      const foodTypes = [
-        '한식', '중식', '일식', '양식', '분식', '치킨', '피자', '햄버거', '샐러드', '디저트',
-        '카페', '베이커리', '떡볶이', '순대', '김밥', '라면', '돈까스', '회', '초밥', '라멘',
-        '파스타', '스테이크', '샐러드', '샌드위치', '브런치', '아침', '점심', '저녁', '야식', '술집'
-      ];
-      
-      // 지역 + 맛집 패턴
-      locations.slice(0, 20).forEach(location => {
-        if (!existingKeywords.includes(`${location}맛집`)) {
-          patterns.push(`${location}맛집`);
-        }
-        if (!existingKeywords.includes(`${location}역맛집`)) {
-          patterns.push(`${location}역맛집`);
-        }
-        if (!existingKeywords.includes(`${location}근처맛집`)) {
-          patterns.push(`${location}근처맛집`);
-        }
-      });
-      
-      // 음식 종류 + 맛집 패턴
-      foodTypes.forEach(food => {
-        if (!existingKeywords.includes(`${food}맛집`)) {
-          patterns.push(`${food}맛집`);
-        }
-        if (!existingKeywords.includes(`맛있는${food}`)) {
-          patterns.push(`맛있는${food}`);
-        }
-      });
-    }
-    
-    // 쇼핑 관련 패턴
-    if (seedKeyword.includes('쇼핑') || seedKeyword.includes('몰') || seedKeyword.includes('백화점')) {
-      const shoppingTypes = [
-        '온라인쇼핑', '오프라인쇼핑', '패션쇼핑', '뷰티쇼핑', '홈쇼핑', '쇼핑몰', '백화점',
-        '아울렛', '마트', '편의점', '약국', '서점', '문구점', '가구점', '전자제품'
-      ];
-      
-      shoppingTypes.forEach(type => {
-        if (!existingKeywords.includes(type)) {
-          patterns.push(type);
-        }
-      });
-    }
-    
-    // 여행 관련 패턴
-    if (seedKeyword.includes('여행') || seedKeyword.includes('관광') || seedKeyword.includes('휴가')) {
-      const travelTypes = [
-        '국내여행', '해외여행', '제주여행', '부산여행', '강원여행', '경주여행',
-        '관광지', '명소', '맛집', '숙소', '호텔', '펜션', '게스트하우스', '리조트',
-        '항공권', '기차표', '버스표', '렌터카', '여행사', '패키지여행'
-      ];
-      
-      travelTypes.forEach(type => {
-        if (!existingKeywords.includes(type)) {
-          patterns.push(type);
-        }
-      });
-    }
-    
-    // 일반적인 검색 패턴
-    const commonSuffixes = ['추천', '후기', '리뷰', '가격', '할인', '쿠폰', '이벤트', '정보', '방법', '팁'];
-    const commonPrefixes = ['좋은', '최고의', '인기', '유명한', '저렴한', '고급', '신상', '베스트'];
-    
-    // 기존 키워드에 접미사/접두사 추가
-    existingKeywords.slice(0, 10).forEach(keyword => {
-      commonSuffixes.forEach(suffix => {
-        const newKeyword = `${keyword}${suffix}`;
-        if (!existingKeywords.includes(newKeyword) && !patterns.includes(newKeyword)) {
-          patterns.push(newKeyword);
-        }
-      });
-      
-      commonPrefixes.forEach(prefix => {
-        const newKeyword = `${prefix}${keyword}`;
-        if (!existingKeywords.includes(newKeyword) && !patterns.includes(newKeyword)) {
-          patterns.push(newKeyword);
-        }
-      });
-    });
-    
-    return patterns.slice(0, 100); // 최대 100개 패턴만 반환
-  }
 
   // API 키 상태 조회
   getApiKeyStatus() {
