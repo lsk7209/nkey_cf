@@ -147,6 +147,8 @@ export default function DataPage() {
     setWebkrCountMax('')
     setSortBy('cafe_count')
     setSortOrder('asc')
+    // 필터 초기화 후 데이터 다시 로드
+    setTimeout(() => loadData(1), 100)
   }
 
   // 초기 로드
@@ -155,9 +157,13 @@ export default function DataPage() {
     loadSeedKeywords()
   }, [])
 
-  // 필터 변경 시 데이터 재로드
+  // 필터 변경 시 자동으로 데이터 다시 로드 (디바운스 적용)
   useEffect(() => {
-    loadData(1)
+    const timeoutId = setTimeout(() => {
+      loadData(1)
+    }, 500) // 500ms 디바운스
+
+    return () => clearTimeout(timeoutId)
   }, [search, seedKeyword, sortBy, sortOrder, totalSearchMin, totalSearchMax, cafeCountMin, cafeCountMax, blogCountMin, blogCountMax, newsCountMin, newsCountMax, webkrCountMin, webkrCountMax])
 
   // 페이지 변경

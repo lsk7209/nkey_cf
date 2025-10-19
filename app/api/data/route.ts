@@ -23,6 +23,20 @@ export async function GET(request: NextRequest) {
     const webkrCountMin = searchParams.get('webkrCountMin')
     const webkrCountMax = searchParams.get('webkrCountMax')
 
+    // 디버깅: 필터 파라미터 로깅
+    console.log('🔍 필터 파라미터:', {
+      totalSearchMin,
+      totalSearchMax,
+      cafeCountMin,
+      cafeCountMax,
+      blogCountMin,
+      blogCountMax,
+      newsCountMin,
+      newsCountMax,
+      webkrCountMin,
+      webkrCountMax
+    })
+
     // 페이지네이션 계산
     const offset = (page - 1) * limit
 
@@ -98,6 +112,17 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // 디버깅: 필터링 결과 로깅
+    console.log('📊 필터링 결과:', {
+      totalCount: count,
+      returnedData: data?.length || 0,
+      sampleData: data?.slice(0, 3).map(item => ({
+        keyword: item.keyword,
+        total_search: item.total_search,
+        cafe_count: item.cafe_count
+      }))
+    })
 
     // 총 페이지 수 계산
     const totalPages = Math.ceil((count || 0) / limit)
