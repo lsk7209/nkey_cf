@@ -308,6 +308,157 @@ export class NaverKeywordAPI {
     }
   }
 
+  // 고성능 병렬 처리: 여러 키워드의 상세 통계를 동시에 수집
+  async getBatchKeywordStats(
+    keywords: string[], 
+    maxConcurrency: number = 10,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<ProcessedKeywordData[]> {
+    const results: ProcessedKeywordData[] = [];
+    const availableKeys = this.apiKeyManager.getAvailableApiKeys(maxConcurrency);
+    
+    if (availableKeys.length === 0) {
+      console.warn('사용 가능한 API 키가 없어 배치 처리를 중단합니다.');
+      return results;
+    }
+
+    console.log(`${keywords.length}개 키워드를 ${availableKeys.length}개 API 키로 병렬 처리합니다.`);
+
+    // 키워드를 청크로 나누기
+    const chunkSize = Math.ceil(keywords.length / availableKeys.length);
+    const chunks = [];
+    for (let i = 0; i < keywords.length; i += chunkSize) {
+      chunks.push(keywords.slice(i, i + chunkSize));
+    }
+
+    // 각 API 키로 청크를 병렬 처리
+    let processedCount = 0;
+    const chunkPromises = chunks.map(async (chunk, index) => {
+      const apiKey = availableKeys[index % availableKeys.length];
+      const chunkResults: ProcessedKeywordData[] = [];
+
+      for (const keyword of chunk) {
+        try {
+          const result = await this.getKeywordStatsWithKey(keyword, apiKey);
+          if (result) {
+            chunkResults.push(result);
+          }
+          
+          // 진행률 업데이트
+          processedCount++;
+          if (onProgress) {
+            onProgress(processedCount, keywords.length);
+          }
+          
+          // API 호출 간격 조절
+          await new Promise(resolve => setTimeout(resolve, 50));
+        } catch (error) {
+          console.error(`키워드 "${keyword}" 처리 실패:`, error);
+          processedCount++;
+          if (onProgress) {
+            onProgress(processedCount, keywords.length);
+          }
+        }
+      }
+
+      return chunkResults;
+    });
+
+    // 모든 청크 결과를 기다리고 합치기
+    const allChunkResults = await Promise.all(chunkPromises);
+    allChunkResults.forEach(chunkResult => {
+      results.push(...chunkResult);
+    });
+
+    console.log(`배치 처리 완료: ${results.length}개 키워드 수집됨`);
+    return results;
+  }
+
+  // 특정 API 키로 키워드 통계 조회 (재시도 로직 포함)
+  private async getKeywordStatsWithKey(keyword: string, apiKeyInfo: any, maxRetries: number = 3): Promise<ProcessedKeywordData | null> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const timestamp = Date.now().toString();
+        const method = 'GET';
+        const uri = '/keywordstool';
+        const signature = this.generateSignature(timestamp, method, uri, apiKeyInfo.secret);
+
+        const params = new URLSearchParams({
+          hintKeywords: keyword,
+          showDetail: '1',
+        });
+
+        const url = `${this.baseUrl}${uri}?${params.toString()}`;
+
+        const headers = {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'X-Timestamp': timestamp,
+          'X-API-KEY': apiKeyInfo.apiKey,
+          'X-Customer': apiKeyInfo.customerId,
+          'X-Signature': signature,
+        };
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          timeout: 10000, // 10초 타임아웃
+        });
+
+        // API 사용량 증가
+        this.apiKeyManager.incrementUsage(apiKeyInfo.id);
+
+        if (response.status === 429) {
+          this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
+          throw new Error('API 호출 한도 초과');
+        }
+
+        if (response.status === 500 || response.status === 502 || response.status === 503) {
+          // 서버 오류는 재시도
+          throw new Error(`서버 오류: ${response.status}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(`API 요청 실패: ${response.status}`);
+        }
+
+        const data: NaverApiResponse = await response.json();
+        
+        if (!data || !data.keywordList || !Array.isArray(data.keywordList)) {
+          return null;
+        }
+
+        const validItems = data.keywordList.filter(item => item && typeof item === 'object');
+        if (validItems.length === 0) {
+          return null;
+        }
+
+        return this.processKeywordData(validItems[0]);
+        
+      } catch (error) {
+        lastError = error as Error;
+        
+        // 429 에러나 네트워크 오류가 아닌 경우 재시도하지 않음
+        if (error instanceof Error && 
+            (error.message.includes('한도 초과') || 
+             error.message.includes('API 요청 실패'))) {
+          break;
+        }
+        
+        // 재시도 전 대기 (지수 백오프)
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.warn(`키워드 "${keyword}" ${attempt}차 시도 실패, ${delay}ms 후 재시도:`, error);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    console.error(`키워드 "${keyword}" 최종 실패 (${maxRetries}회 시도):`, lastError);
+    return null;
+  }
+
 
   // API 키 상태 조회
   getApiKeyStatus() {

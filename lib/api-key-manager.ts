@@ -90,6 +90,26 @@ export class ApiKeyManager {
     return sortedKeys[0]
   }
 
+  // 여러 API 키를 동시에 가져오기 (병렬 처리용)
+  getAvailableApiKeys(count: number): ApiKeyInfo[] {
+    const availableKeys = this.apiKeys.filter(key => key.isActive && key.dailyUsage < this.DAILY_LIMIT)
+
+    if (availableKeys.length === 0) {
+      return []
+    }
+
+    // 사용량과 마지막 사용 시간을 고려하여 정렬
+    const sortedKeys = availableKeys.sort((a, b) => {
+      if (a.dailyUsage !== b.dailyUsage) {
+        return a.dailyUsage - b.dailyUsage
+      }
+      return a.lastUsed - b.lastUsed
+    })
+
+    // 요청한 개수만큼 반환 (최대 사용 가능한 키 수)
+    return sortedKeys.slice(0, Math.min(count, availableKeys.length))
+  }
+
   // API 키 사용량 증가
   incrementUsage(apiKeyId: string, usage: number = 1) {
     const key = this.apiKeys.find(k => k.id === apiKeyId)

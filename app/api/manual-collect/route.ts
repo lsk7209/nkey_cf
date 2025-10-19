@@ -32,68 +32,65 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 키워드 수가 많을 경우 배치 처리로 최적화
-    const keywordDetails = []
-    const batchSize = 100; // 한 번에 처리할 키워드 수
-    const totalBatches = Math.ceil(relatedKeywords.length / batchSize);
+    // 🚀 고성능 병렬 처리: 다중 API 키 활용 + 메모리 최적화
+    const startTime = Date.now();
+    console.log(`🚀 고성능 병렬 처리 시작: ${relatedKeywords.length}개 키워드 (${new Date().toISOString()})`);
     
-    console.log(`총 ${relatedKeywords.length}개 키워드를 ${totalBatches}개 배치로 처리합니다.`);
+    // 메모리 효율적인 스트리밍 처리
+    const batchSize = 500; // 메모리 효율을 위해 500개씩 처리
+    const totalBatches = Math.ceil(relatedKeywords.length / batchSize);
+    const allKeywordDetails: any[] = [];
     
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
       const startIndex = batchIndex * batchSize;
       const endIndex = Math.min(startIndex + batchSize, relatedKeywords.length);
       const batchKeywords = relatedKeywords.slice(startIndex, endIndex);
       
-      console.log(`배치 ${batchIndex + 1}/${totalBatches} 처리 중: ${batchKeywords.length}개 키워드`);
+      console.log(`📦 배치 ${batchIndex + 1}/${totalBatches} 처리 중: ${batchKeywords.length}개 키워드`);
       
-      // 배치 내에서 병렬 처리 (최대 20개씩)
-      const parallelSize = 20;
-      for (let i = 0; i < batchKeywords.length; i += parallelSize) {
-        const parallelBatch = batchKeywords.slice(i, i + parallelSize);
-        
-        const batchPromises = parallelBatch.map(async (keyword) => {
-          try {
-            const details = await naverAPI.getKeywordStats(keyword)
-            if (details) {
-              // 문서수 정보 수집
-              try {
-                const documentCounts = await documentAPI.getDocumentCounts(keyword)
-                return {
-                  ...details,
-                  blog_count: documentCounts.blog,
-                  news_count: documentCounts.news,
-                  webkr_count: documentCounts.webkr,
-                  cafe_count: documentCounts.cafe
-                }
-              } catch (docError) {
-                console.error(`키워드 "${keyword}" 문서수 수집 실패:`, docError)
-                return details
-              }
-            }
-            return null
-          } catch (error) {
-            console.error(`키워드 "${keyword}" 상세 정보 수집 실패:`, error)
-            return null
-          }
-        })
-        
-        const batchResults = await Promise.all(batchPromises)
-        const validResults = batchResults.filter(result => result !== null)
-        keywordDetails.push(...validResults)
-        
-        // 배치 간 대기
-        if (i + parallelSize < batchKeywords.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+      // 1단계: 키워드 통계 수집 (병렬 처리)
+      console.log(`📊 배치 ${batchIndex + 1} - 1단계: 키워드 통계 수집 중...`);
+      const keywordStats = await naverAPI.getBatchKeywordStats(batchKeywords, 10);
+      console.log(`✅ 배치 ${batchIndex + 1} - 1단계 완료: ${keywordStats.length}개 키워드 통계 수집됨`);
+      
+      // 2단계: 문서수 수집 (병렬 처리)
+      console.log(`📄 배치 ${batchIndex + 1} - 2단계: 문서수 수집 중...`);
+      const keywordsForDocs = keywordStats.map(stat => stat.keyword);
+      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 5);
+      console.log(`✅ 배치 ${batchIndex + 1} - 2단계 완료: ${documentCountsMap.size}개 키워드 문서수 수집됨`);
+      
+      // 3단계: 데이터 통합
+      console.log(`🔗 배치 ${batchIndex + 1} - 3단계: 데이터 통합 중...`);
+      const batchKeywordDetails = keywordStats.map(stat => {
+        const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 };
+        return {
+          ...stat,
+          blog_count: docCounts.blog,
+          news_count: docCounts.news,
+          webkr_count: docCounts.webkr,
+          cafe_count: docCounts.cafe
+        };
+      });
+      
+      allKeywordDetails.push(...batchKeywordDetails);
+      console.log(`✅ 배치 ${batchIndex + 1} 완료: ${batchKeywordDetails.length}개 키워드 처리됨 (총 ${allKeywordDetails.length}개)`);
+      
+      // 메모리 정리 (가비지 컬렉션 유도)
+      if (batchIndex % 5 === 0) {
+        if (global.gc) {
+          global.gc();
         }
       }
-      
-      console.log(`배치 ${batchIndex + 1} 완료: ${keywordDetails.length}개 키워드 수집됨`)
-      
-      // 배치 간 대기 (API 부하 분산)
-      if (batchIndex < totalBatches - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200))
-      }
     }
+    
+    const keywordDetails = allKeywordDetails;
+    const endTime = Date.now();
+    const totalTime = (endTime - startTime) / 1000;
+    const avgTimePerKeyword = totalTime / keywordDetails.length;
+    
+    console.log(`🎉 고성능 병렬 처리 완료: ${keywordDetails.length}개 키워드 최종 수집됨`);
+    console.log(`⏱️ 총 처리 시간: ${totalTime.toFixed(2)}초 (키워드당 평균: ${avgTimePerKeyword.toFixed(3)}초)`);
+    console.log(`📊 처리 속도: ${(keywordDetails.length / totalTime).toFixed(2)}개/초`);
 
     // 수집된 키워드 데이터를 데이터베이스에 저장
     if (keywordDetails.length > 0) {
