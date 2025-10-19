@@ -209,13 +209,6 @@ export default function DataPage() {
     document.body.removeChild(link)
   }
 
-  // 필터 초기화
-  const resetFilters = () => {
-    setSearch('')
-    setSeedKeyword('')
-    setSortBy('total_search')
-    setSortOrder('desc')
-  }
 
   // 문서수 일괄 업데이트
   const updateAllDocumentCounts = async () => {
