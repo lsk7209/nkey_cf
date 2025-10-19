@@ -86,13 +86,18 @@ export default function ManualCollectPage() {
       setProgress({ current: 0, total: keywordList.length })
       const allKeywords: KeywordData[] = []
 
-      // 각 시드키워드에 대해 연관키워드 수집
+      // 각 시드키워드에 대해 연관키워드 수집 (실시간 배치 저장)
+      let totalSavedCount = 0
+      let totalProcessedCount = 0
+      
       for (let i = 0; i < keywordList.length; i++) {
         const seedKeyword = keywordList[i]
         setProgress({ current: i + 1, total: keywordList.length })
 
         try {
-          // 네이버 API를 통해 연관키워드 수집
+          console.log(`시드키워드 "${seedKeyword}" 수집 시작...`)
+          
+          // 네이버 API를 통해 연관키워드 수집 (실시간 배치 저장)
           const response = await fetch('/api/manual-collect', {
             method: 'POST',
             headers: {
@@ -108,9 +113,13 @@ export default function ManualCollectPage() {
 
           const data = await response.json()
           allKeywords.push(...data.keywords)
+          totalSavedCount += data.savedCount || 0
+          totalProcessedCount += data.processedCount || 0
           
           // 실시간으로 결과 업데이트
           setKeywords([...allKeywords])
+          
+          console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.savedCount}개 저장됨`)
           
           // API 제한을 고려한 대기 (429 에러 방지)
           if (i < keywordList.length - 1) {
@@ -120,6 +129,12 @@ export default function ManualCollectPage() {
           console.error(`키워드 "${seedKeyword}" 수집 실패:`, err)
           // 개별 키워드 실패는 전체를 중단하지 않음
         }
+      }
+      
+      // 최종 결과 로그
+      console.log(`🎉 전체 수집 완료: ${totalProcessedCount}개 처리, ${totalSavedCount}개 저장`)
+      if (totalProcessedCount > 0) {
+        console.log(`💾 저장 성공률: ${((totalSavedCount / totalProcessedCount) * 100).toFixed(1)}%`)
       }
 
       // 검색량 기준으로 정렬
