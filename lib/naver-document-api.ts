@@ -53,40 +53,78 @@ export class NaverDocumentAPI {
 
       const url = `${this.baseUrl}${endpoint}?${params.toString()}`
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'X-Naver-Client-Id': apiKeyInfo.clientId,
-          'X-Naver-Client-Secret': apiKeyInfo.clientSecret,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      // API 사용량 증가
-      this.openApiKeyManager.incrementUsage(apiKeyInfo.id);
-
-      if (response.status === 429) {
-        // 해당 API 키 비활성화 및 자동 전환
-        this.openApiKeyManager.deactivateApiKey(apiKeyInfo.id, '429 에러');
-        console.warn(`OpenAPI 키 ${apiKeyInfo.name} 호출 한도 초과`);
+      // 재시도 로직이 포함된 fetch 함수
+      const fetchWithRetry = async (retryCount: number = 0): Promise<any> => {
+        const maxRetries = 3
+        const baseDelay = 1000 // 1초
         
-        // 다른 사용 가능한 키로 재시도
-        const nextKey = this.openApiKeyManager.getSmartApiKey();
-        if (nextKey) {
-          console.log(`🔄 다른 키로 자동 전환: ${nextKey.name}`);
-          return await this.searchDocumentsWithKey(query, service, nextKey);
+        try {
+          // AbortController로 타임아웃 설정
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000) // 30초 타임아웃
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'X-Naver-Client-Id': apiKeyInfo.clientId,
+              'X-Naver-Client-Secret': apiKeyInfo.clientSecret,
+              'Content-Type': 'application/json'
+            },
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          // API 사용량 증가
+          this.openApiKeyManager.incrementUsage(apiKeyInfo.id);
+
+          if (response.status === 429) {
+            // 해당 API 키 비활성화 및 자동 전환
+            this.openApiKeyManager.deactivateApiKey(apiKeyInfo.id, '429 에러');
+            console.warn(`OpenAPI 키 ${apiKeyInfo.name} 호출 한도 초과`);
+            
+            // 다른 사용 가능한 키로 재시도
+            const nextKey = this.openApiKeyManager.getSmartApiKey();
+            if (nextKey) {
+              console.log(`🔄 다른 키로 자동 전환: ${nextKey.name}`);
+              return await this.searchDocumentsWithKey(query, service, nextKey);
+            }
+            
+            return 0;
+          }
+
+          if (!response.ok) {
+            console.error(`네이버 ${service} API 호출 실패:`, response.status, response.statusText)
+            return 0
+          }
+
+          const data: NaverDocumentResponse = await response.json()
+          return data.total || 0
+          
+        } catch (error: any) {
+          // 네트워크 에러나 타임아웃 에러인 경우 재시도
+          if (retryCount < maxRetries && (
+            error.name === 'AbortError' || 
+            error.code === 'ETIMEDOUT' || 
+            error.code === 'ECONNRESET' ||
+            error.message.includes('fetch failed') ||
+            error.message.includes('network') ||
+            error.message.includes('socket')
+          )) {
+            const delay = baseDelay * Math.pow(2, retryCount) // 지수 백오프
+            console.warn(`OpenAPI 호출 실패 (시도 ${retryCount + 1}/${maxRetries + 1}): ${error.message}, ${delay}ms 후 재시도`)
+            
+            await new Promise(resolve => setTimeout(resolve, delay))
+            return fetchWithRetry(retryCount + 1)
+          }
+          
+          // 최대 재시도 횟수 초과 또는 재시도 불가능한 에러
+          console.error(`OpenAPI 호출 최종 실패: ${error.message}`)
+          return 0
         }
-        
-        return 0;
       }
 
-      if (!response.ok) {
-        console.error(`네이버 ${service} API 호출 실패:`, response.status, response.statusText)
-        return 0
-      }
-
-      const data: NaverDocumentResponse = await response.json()
-      return data.total || 0
+      return await fetchWithRetry()
 
     } catch (error) {
       console.error(`네이버 ${service} API 오류:`, error)

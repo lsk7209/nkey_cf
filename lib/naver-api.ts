@@ -130,27 +130,66 @@ export class NaverKeywordAPI {
       'X-Signature': signature,
     };
 
+    // 재시도 로직이 포함된 fetch 함수
+    const fetchWithRetry = async (retryCount: number = 0): Promise<any> => {
+      const maxRetries = 3
+      const baseDelay = 1000 // 1초
+      
+      try {
+        // AbortController로 타임아웃 설정
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30초 타임아웃
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+
+        // API 사용량 증가
+        this.apiKeyManager.incrementUsage(apiKeyInfo.id);
+
+        if (response.status === 429) {
+          // 해당 API 키 비활성화
+          this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
+          throw new Error('API 호출 한도 초과. 잠시 후 다시 시도해주세요.');
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API 요청 실패: ${response.status} - ${errorText}`);
+        }
+
+        const data: NaverApiResponse = await response.json();
+        return data;
+        
+      } catch (error: any) {
+        // 네트워크 에러나 타임아웃 에러인 경우 재시도
+        if (retryCount < maxRetries && (
+          error.name === 'AbortError' || 
+          error.code === 'ETIMEDOUT' || 
+          error.code === 'ECONNRESET' ||
+          error.message.includes('fetch failed') ||
+          error.message.includes('network') ||
+          error.message.includes('socket')
+        )) {
+          const delay = baseDelay * Math.pow(2, retryCount) // 지수 백오프
+          console.warn(`네이버 API 호출 실패 (시도 ${retryCount + 1}/${maxRetries + 1}): ${error.message}, ${delay}ms 후 재시도`)
+          
+          await new Promise(resolve => setTimeout(resolve, delay))
+          return fetchWithRetry(retryCount + 1)
+        }
+        
+        // 최대 재시도 횟수 초과 또는 재시도 불가능한 에러
+        console.error(`네이버 API 호출 최종 실패: ${error.message}`)
+        throw error
+      }
+    }
+
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      // API 사용량 증가
-      this.apiKeyManager.incrementUsage(apiKeyInfo.id);
-
-      if (response.status === 429) {
-        // 해당 API 키 비활성화
-        this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
-        throw new Error('API 호출 한도 초과. 잠시 후 다시 시도해주세요.');
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API 요청 실패: ${response.status} - ${errorText}`);
-      }
-
-      const data: NaverApiResponse = await response.json();
+      const data: NaverApiResponse = await fetchWithRetry();
       
       if (!data || !data.keywordList || !Array.isArray(data.keywordList)) {
         console.warn('Invalid API response structure:', data);
