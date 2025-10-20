@@ -105,10 +105,13 @@ export class NaverKeywordAPI {
     }
 
     // 사용 가능한 API 키 가져오기
+    console.log(`🔑 API 키 조회 중...`)
     const apiKeyInfo = this.apiKeyManager.getAvailableApiKey();
     if (!apiKeyInfo) {
+      console.error(`❌ 사용 가능한 API 키가 없습니다.`)
       throw new Error('사용 가능한 API 키가 없습니다.');
     }
+    console.log(`🔑 API 키 선택됨: ${apiKeyInfo.name}`)
 
     const timestamp = Date.now().toString();
     const method = 'GET';
@@ -121,6 +124,7 @@ export class NaverKeywordAPI {
     });
 
     const url = `${this.baseUrl}${uri}?${params.toString()}`;
+    console.log(`🌐 API 호출 URL: ${url}`)
 
     const headers = {
       'Content-Type': 'application/json; charset=UTF-8',
@@ -129,6 +133,7 @@ export class NaverKeywordAPI {
       'X-Customer': apiKeyInfo.customerId,
       'X-Signature': signature,
     };
+    console.log(`📡 API 호출 시작: ${hintKeywords.join(', ')}`)
 
     // 재시도 로직이 포함된 fetch 함수
     const fetchWithRetry = async (retryCount: number = 0): Promise<any> => {
@@ -163,6 +168,7 @@ export class NaverKeywordAPI {
         }
 
         const data: NaverApiResponse = await response.json();
+        console.log(`✅ API 호출 성공: ${data?.keywordList?.length || 0}개 키워드 응답`)
         return data;
         
       } catch (error: any) {
@@ -245,10 +251,14 @@ export class NaverKeywordAPI {
   // 시드키워드로부터 연관키워드 목록 가져오기 (상세 정보 없이)
   async getRelatedKeywords(seedKeyword: string): Promise<string[]> {
     try {
+      console.log(`🔍 연관키워드 수집 시작: "${seedKeyword}"`)
       const allKeywords = new Set<string>();
       
       // 1차: 기본 연관키워드 수집
+      console.log(`📊 1차 수집 시작: "${seedKeyword}"`)
       const primaryKeywords = await this.getKeywords([seedKeyword], false);
+      console.log(`📊 1차 수집 완료: ${primaryKeywords.length}개 키워드 수집됨`)
+      
       primaryKeywords.forEach(k => allKeywords.add(k.keyword));
       console.log(`1차 수집: ${allKeywords.size}개 키워드`);
       
