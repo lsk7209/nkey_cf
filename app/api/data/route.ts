@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 중복 제거
-      const uniqueSeedKeywords = Array.from(new Set(data?.map(item => item.seed_keyword) || []))
+      const uniqueSeedKeywords = Array.from(new Set(data?.map((item: any) => item.seed_keyword) || []))
 
       return NextResponse.json({
         seedKeywords: uniqueSeedKeywords
