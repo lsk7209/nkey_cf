@@ -2,34 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { NaverKeywordAPI } from '@/lib/naver-api'
 import { NaverDocumentAPI } from '@/lib/naver-document-api'
 import { supabase } from '@/lib/supabase'
-
-// 중복 키워드 필터링 함수
-async function filterDuplicateKeywords(keywordDetails: any[]) {
-  if (keywordDetails.length === 0) return []
-  
-  const keywords = keywordDetails.map(detail => detail.keyword)
-  
-  // 30일 이내에 존재하는 키워드들 조회
-  const { data: existingKeywords, error } = await supabase
-    .from('manual_collection_results')
-    .select('keyword')
-    .in('keyword', keywords)
-    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30일 전
-  
-  if (error) {
-    console.error('중복 키워드 조회 오류:', error)
-    return keywordDetails // 오류 시 모든 키워드 반환
-  }
-  
-  const existingKeywordSet = new Set(existingKeywords?.map((item: any) => item.keyword) || [])
-  
-  // 중복되지 않은 키워드만 필터링
-  const filteredKeywords = keywordDetails.filter(detail => !existingKeywordSet.has(detail.keyword))
-  
-  console.log(`🔍 중복 키워드 필터링: ${keywordDetails.length}개 → ${filteredKeywords.length}개 (중복 제외: ${keywordDetails.length - filteredKeywords.length}개)`)
-  
-  return filteredKeywords
-}
+import { 
+  filterDuplicateKeywords, 
+  transformToInsertData, 
+  saveKeywordsBatch, 
+  cleanupMemory, 
+  delay,
+  logError,
+  logSuccess,
+  logProgress,
+  type KeywordDetail
+} from '@/lib/utils'
 
 // 자동수집3 상태 업데이트 함수
 async function updateAutoCollect3Status(updates: any) {

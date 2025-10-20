@@ -1,5 +1,6 @@
 import CryptoJS from 'crypto-js';
-import { ApiKeyManager } from './api-key-manager';
+import { ApiKeyManager } from './api-key-manager'
+import { ProcessedKeywordData, NaverApiResponse, NaverKeywordData } from '@/types';
 
 export interface NaverKeywordData {
   relKeyword: string;
@@ -13,28 +14,7 @@ export interface NaverKeywordData {
   compIdx: string;
 }
 
-export interface NaverApiResponse {
-  keywordList: NaverKeywordData[];
-}
-
-export interface ProcessedKeywordData {
-  keyword: string;
-  pc_search: number;
-  mobile_search: number;
-  total_search: number;
-  monthly_click_pc: number;
-  monthly_click_mobile: number;
-  ctr_pc: number;
-  ctr_mobile: number;
-  ad_count: number;
-  comp_idx: string;
-  blog_count?: number;
-  news_count?: number;
-  webkr_count?: number;
-  cafe_count?: number;
-  raw_json: string;
-  fetched_at: string;
-}
+// 타입은 types/index.ts에서 import
 
 export class NaverKeywordAPI {
   private baseUrl: string;

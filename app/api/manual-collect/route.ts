@@ -1,35 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NaverKeywordAPI } from '@/lib/naver-api'
 import { NaverDocumentAPI } from '@/lib/naver-document-api'
-import { supabase } from '@/lib/supabase'
-
-// 중복 키워드 필터링 함수
-async function filterDuplicateKeywords(keywordDetails: any[]) {
-  if (keywordDetails.length === 0) return []
-  
-  const keywords = keywordDetails.map(detail => detail.keyword)
-  
-  // 30일 이내에 존재하는 키워드들 조회
-  const { data: existingKeywords, error } = await supabase
-    .from('manual_collection_results')
-    .select('keyword')
-    .in('keyword', keywords)
-    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30일 전
-  
-  if (error) {
-    console.error('중복 키워드 조회 오류:', error)
-    return keywordDetails // 오류 시 모든 키워드 반환
-  }
-  
-  const existingKeywordSet = new Set(existingKeywords?.map((item: any) => item.keyword) || [])
-  
-  // 중복되지 않은 키워드만 필터링
-  const filteredKeywords = keywordDetails.filter(detail => !existingKeywordSet.has(detail.keyword))
-  
-  console.log(`🔍 중복 키워드 필터링: ${keywordDetails.length}개 → ${filteredKeywords.length}개 (중복 제외: ${keywordDetails.length - filteredKeywords.length}개)`)
-  
-  return filteredKeywords
-}
+import { 
+  filterDuplicateKeywords, 
+  transformToInsertData, 
+  saveKeywordsBatch, 
+  cleanupMemory, 
+  delay,
+  logError,
+  logSuccess,
+  logProgress,
+  type KeywordDetail
+} from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -112,7 +94,7 @@ async function executeManualCollect(seedKeyword: string) {
         const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, documentConcurrency)
         
         // 3. 데이터 통합
-        const batchKeywordDetails = keywordStats.map(stat => {
+        const batchKeywordDetails: KeywordDetail[] = keywordStats.map(stat => {
           const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 }
           return {
             ...stat,
@@ -129,50 +111,27 @@ async function executeManualCollect(seedKeyword: string) {
           const filteredKeywords = await filterDuplicateKeywords(batchKeywordDetails)
           
           if (filteredKeywords.length > 0) {
-            const insertData = filteredKeywords.map(detail => ({
-              seed_keyword: seedKeyword,
-              keyword: detail.keyword,
-              pc_search: detail.pc_search,
-              mobile_search: detail.mobile_search,
-              total_search: detail.total_search,
-              monthly_click_pc: detail.monthly_click_pc,
-              monthly_click_mobile: detail.monthly_click_mobile,
-              ctr_pc: detail.ctr_pc,
-              ctr_mobile: detail.ctr_mobile,
-              ad_count: detail.ad_count,
-              comp_idx: detail.comp_idx,
-              blog_count: detail.blog_count || 0,
-              news_count: detail.news_count || 0,
-              webkr_count: detail.webkr_count || 0,
-              cafe_count: detail.cafe_count || 0,
-              is_used_as_seed: false, // 수동수집으로 수집된 키워드는 기본적으로 미활용
-              raw_json: detail.raw_json,
-              fetched_at: detail.fetched_at
-            }))
-
-            const { error: insertError } = await supabase
-              .from('manual_collection_results')
-              .insert(insertData)
-
-            if (insertError) {
-              console.error(`❌ 배치 ${batchIndex + 1} 저장 실패:`, insertError)
-            } else {
-              totalSavedCount += filteredKeywords.length
+            const insertData = transformToInsertData(filteredKeywords, seedKeyword, false)
+            const result = await saveKeywordsBatch(insertData, batchIndex, totalBatches)
+            
+            if (result.success) {
+              totalSavedCount += result.savedCount
               const duplicateCount = batchKeywordDetails.length - filteredKeywords.length
-              console.log(`✅ 배치 ${batchIndex + 1} 저장 완료: ${filteredKeywords.length}개 키워드 (중복 제외: ${duplicateCount}개, 총 저장: ${totalSavedCount}개)`)
+              logSuccess(`배치 ${batchIndex + 1}`, `${result.savedCount}개 키워드 저장 (중복 제외: ${duplicateCount}개, 총 저장: ${totalSavedCount}개)`)
+            } else {
+              logError(`배치 ${batchIndex + 1} 저장`, result.error || '알 수 없는 오류')
             }
           } else {
             console.log(`⏭️ 배치 ${batchIndex + 1}: 모든 키워드가 중복이므로 패스`)
           }
         }
         
-        // 메모리 정리 (가비지 컬렉션 유도)
-        if (global.gc) {
-          global.gc()
-        }
+        // 메모리 정리 및 진행 상황 로깅
+        cleanupMemory()
+        logProgress('수동수집', batchIndex + 1, totalBatches, `배치 처리 완료`)
 
         // 다음 배치 시작 전 잠시 대기 (API 부하 분산 및 안정성)
-        await new Promise(resolve => setTimeout(resolve, 500)) // 0.5초 대기
+        await delay(500) // 0.5초 대기
 
       } catch (batchError) {
         console.error(`❌ 배치 ${batchIndex + 1} 처리 실패:`, batchError)
