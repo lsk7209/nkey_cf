@@ -109,12 +109,32 @@ export async function saveKeywordsBatch(
   totalBatches: number
 ): Promise<{ success: boolean; savedCount: number; error?: string }> {
   try {
+    console.log(`🔍 저장할 데이터 상세:`, {
+      데이터개수: insertData.length,
+      첫번째키워드: insertData[0]?.keyword,
+      시드키워드: insertData[0]?.seed_keyword,
+      샘플데이터: insertData[0]
+    })
+    
+    console.log(`💾 Supabase 연결 확인 중...`)
+    if (!supabase) {
+      console.error(`❌ Supabase 클라이언트가 초기화되지 않음`)
+      return { success: false, savedCount: 0, error: 'Supabase 클라이언트 초기화 실패' }
+    }
+    
+    console.log(`📡 데이터베이스 삽입 시작...`)
     const { error: insertError } = await supabase
       .from('manual_collection_results')
       .insert(insertData)
 
     if (insertError) {
       console.error(`❌ 배치 ${batchIndex + 1}/${totalBatches} 저장 실패:`, insertError)
+      console.error(`❌ 삽입 오류 상세:`, {
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint
+      })
       return { success: false, savedCount: 0, error: insertError.message }
     }
 
@@ -122,6 +142,7 @@ export async function saveKeywordsBatch(
     return { success: true, savedCount: insertData.length }
   } catch (error: any) {
     console.error(`❌ 배치 ${batchIndex + 1}/${totalBatches} 저장 중 오류:`, error)
+    console.error(`❌ 오류 스택:`, error.stack)
     return { success: false, savedCount: 0, error: error.message }
   }
 }
