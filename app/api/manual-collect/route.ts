@@ -82,19 +82,31 @@ async function executeManualCollect(seedKeyword: string) {
     try {
       relatedKeywords = await Promise.race([relatedKeywordsPromise, timeoutPromise])
       console.log(`📊 연관키워드 수집 결과: ${relatedKeywords.length}개`)
+      console.log(`📝 연관키워드 목록:`, relatedKeywords.slice(0, 10)) // 처음 10개 로그
     } catch (timeoutError) {
       console.error(`⏰ 연관키워드 수집 타임아웃:`, timeoutError)
       console.log(`🔄 타임아웃으로 인한 수동수집 중단`)
-      return
+      return {
+        success: false,
+        processedCount: 0,
+        savedCount: 0,
+        successRate: 0,
+        error: '연관키워드 수집 타임아웃'
+      }
     }
     
     if (relatedKeywords.length === 0) {
       console.log(`⚠️ 시드키워드 "${seedKeyword}" 연관키워드 없음`)
-      return
+      return {
+        success: false,
+        processedCount: 0,
+        savedCount: 0,
+        successRate: 0,
+        error: '연관키워드 없음'
+      }
     }
 
     console.log(`✅ 시드키워드 "${seedKeyword}" 연관키워드 ${relatedKeywords.length}개 수집됨`)
-    console.log(`📝 연관키워드 목록:`, relatedKeywords.slice(0, 5)) // 처음 5개만 로그
 
     // 🚀 고성능 병렬 처리: 다중 API 키 활용 + 메모리 최적화 + 실시간 배치 저장
     const batchSize = 10 // 배치 크기 더 축소 (안정성 우선)
@@ -114,20 +126,32 @@ async function executeManualCollect(seedKeyword: string) {
     try {
       // 1. 키워드 통계 수집 (단일 키워드)
       console.log(`📊 키워드 통계 수집 시작...`)
+      console.log(`📝 수집할 키워드:`, testKeywords)
+      
       const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 1)
       console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
+      console.log(`📊 수집된 통계 데이터:`, keywordStats)
       totalProcessedCount += keywordStats.length
       
       if (keywordStats.length === 0) {
-        console.log(`⚠️ 키워드 통계 수집 실패`)
-        return
+        console.log(`⚠️ 키워드 통계 수집 실패 - API 응답 없음`)
+        return {
+          success: false,
+          processedCount: 0,
+          savedCount: 0,
+          successRate: 0,
+          error: '키워드 통계 수집 실패'
+        }
       }
 
       // 2. 문서수 수집 (단일 키워드)
       console.log(`📄 문서수 수집 시작...`)
       const keywordsForDocs = keywordStats.map(stat => stat.keyword)
+      console.log(`📝 문서수 수집할 키워드:`, keywordsForDocs)
+      
       const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 1)
       console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
+      console.log(`📄 문서수 데이터:`, Object.fromEntries(documentCountsMap))
       
       // 3. 데이터 통합
       const batchKeywordDetails: KeywordDetail[] = keywordStats.map(stat => {
@@ -146,13 +170,18 @@ async function executeManualCollect(seedKeyword: string) {
       // 4. 데이터베이스에 저장 (중복 키워드 처리 포함)
       if (batchKeywordDetails.length > 0) {
         console.log(`💾 데이터베이스 저장 시작...`)
+        console.log(`📊 저장할 키워드 상세:`, batchKeywordDetails)
+        
         // 중복 키워드 필터링
         const filteredKeywords = await filterDuplicateKeywords(batchKeywordDetails)
         console.log(`🔍 중복 필터링 후:`, filteredKeywords.length, '개')
+        console.log(`🔍 필터링된 키워드:`, filteredKeywords)
         
         if (filteredKeywords.length > 0) {
           const insertData = transformToInsertData(filteredKeywords, seedKeyword, false)
           console.log(`📝 저장할 데이터:`, insertData.length, '개')
+          console.log(`📝 저장할 데이터 상세:`, insertData)
+          
           const result = await saveKeywordsBatch(insertData, 0, 1)
           
           if (result.success) {
@@ -164,6 +193,8 @@ async function executeManualCollect(seedKeyword: string) {
         } else {
           console.log(`⏭️ 모든 키워드가 중복이므로 패스`)
         }
+      } else {
+        console.log(`⚠️ 저장할 키워드 데이터가 없음`)
       }
       
     } catch (testError: any) {
