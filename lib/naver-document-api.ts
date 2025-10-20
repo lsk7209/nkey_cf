@@ -66,9 +66,17 @@ export class NaverDocumentAPI {
       this.openApiKeyManager.incrementUsage(apiKeyInfo.id);
 
       if (response.status === 429) {
-        // 해당 API 키 비활성화
-        this.openApiKeyManager.deactivateApiKey(apiKeyInfo.id);
+        // 해당 API 키 비활성화 및 자동 전환
+        this.openApiKeyManager.deactivateApiKey(apiKeyInfo.id, '429 에러');
         console.warn(`OpenAPI 키 ${apiKeyInfo.name} 호출 한도 초과`);
+        
+        // 다른 사용 가능한 키로 재시도
+        const nextKey = this.openApiKeyManager.getSmartApiKey();
+        if (nextKey) {
+          console.log(`🔄 다른 키로 자동 전환: ${nextKey.name}`);
+          return await this.searchDocumentsWithKey(keyword, service, nextKey);
+        }
+        
         return 0;
       }
 
@@ -135,18 +143,32 @@ export class NaverDocumentAPI {
       chunks.push(keywords.slice(i, i + chunkSize))
     }
 
-    // 각 API 키로 청크를 병렬 처리
+    // 각 API 키로 청크를 병렬 처리 (스마트 키 전환 포함)
     const chunkPromises = chunks.map(async (chunk, index) => {
-      const apiKey = availableKeys[index % availableKeys.length]
+      let currentApiKey = availableKeys[index % availableKeys.length]
       const chunkResults = new Map<string, DocumentCounts>()
 
       for (const keyword of chunk) {
         try {
-          const counts = await this.getDocumentCountsWithKey(keyword, apiKey)
+          // 현재 키가 비활성화된 경우 다른 키로 전환
+          if (!currentApiKey.isActive) {
+            const nextKey = this.openApiKeyManager.getSmartApiKey()
+            if (nextKey) {
+              currentApiKey = nextKey
+              console.log(`🔄 청크 ${index + 1}: 키 전환 → ${currentApiKey.name}`)
+            } else {
+              console.warn(`⚠️ 청크 ${index + 1}: 사용 가능한 키가 없어 기본값 설정`)
+              chunkResults.set(keyword, { blog: 0, news: 0, webkr: 0, cafe: 0 })
+              continue
+            }
+          }
+
+          const counts = await this.getDocumentCountsWithKey(keyword, currentApiKey)
           chunkResults.set(keyword, counts)
           
-          // API 호출 간격 조절
-          await new Promise(resolve => setTimeout(resolve, 100))
+          // API 호출 간격 조절 (키 사용량에 따라 조절)
+          const delay = currentApiKey.dailyUsage > 20000 ? 200 : 100
+          await new Promise(resolve => setTimeout(resolve, delay))
         } catch (error) {
           console.error(`키워드 "${keyword}" 문서수 조회 실패:`, error)
           chunkResults.set(keyword, { blog: 0, news: 0, webkr: 0, cafe: 0 })

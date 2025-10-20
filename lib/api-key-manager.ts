@@ -120,12 +120,39 @@ export class ApiKeyManager {
   }
 
   // API 키 비활성화 (한도 초과 시)
-  deactivateApiKey(apiKeyId: string) {
+  deactivateApiKey(apiKeyId: string, reason: string = '한도 초과') {
     const key = this.apiKeys.find(k => k.id === apiKeyId)
     if (key) {
       key.isActive = false
-      console.warn(`API 키 ${key.name} 비활성화 (한도 초과)`)
+      console.warn(`API 키 ${key.name} 비활성화 (${reason})`)
+      
+      // 다른 사용 가능한 키가 있는지 확인
+      const availableKeys = this.getAvailableApiKeys(1)
+      if (availableKeys.length > 0) {
+        console.log(`🔄 다른 사용 가능한 Search Ad API 키로 자동 전환: ${availableKeys[0].name}`)
+      } else {
+        console.warn(`⚠️ 모든 Search Ad API 키가 비활성화되었습니다.`)
+      }
     }
+  }
+
+  // 스마트 키 선택 (에러율, 응답시간 등을 고려)
+  getSmartApiKey(): ApiKeyInfo | null {
+    const availableKeys = this.apiKeys.filter(key => key.isActive && key.dailyUsage < this.DAILY_LIMIT)
+    
+    if (availableKeys.length === 0) {
+      return null
+    }
+
+    // 사용량이 적고, 최근에 사용하지 않은 키 우선 선택
+    return availableKeys.sort((a, b) => {
+      // 1순위: 사용량이 적은 키
+      if (a.dailyUsage !== b.dailyUsage) {
+        return a.dailyUsage - b.dailyUsage
+      }
+      // 2순위: 오래 전에 사용한 키
+      return a.lastUsed.getTime() - b.lastUsed.getTime()
+    })[0]
   }
 
   // 모든 API 키 상태 조회

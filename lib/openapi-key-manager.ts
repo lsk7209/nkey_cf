@@ -122,12 +122,53 @@ export class OpenApiKeyManager {
     }
   }
 
-  deactivateApiKey(keyId: string) {
+  deactivateApiKey(keyId: string, reason: string = '429 에러') {
     const key = this.apiKeys.find(k => k.id === keyId);
     if (key) {
       key.isActive = false;
-      console.warn(`OpenAPI 키 ${key.name} (ID: ${key.id}) 수동 비활성화 (429 에러).`);
+      console.warn(`OpenAPI 키 ${key.name} (ID: ${key.id}) 수동 비활성화 (${reason}).`);
+      
+      // 다른 사용 가능한 키가 있는지 확인
+      const availableKeys = this.getAvailableApiKeys(1);
+      if (availableKeys.length > 0) {
+        console.log(`🔄 다른 사용 가능한 OpenAPI 키로 자동 전환: ${availableKeys[0].name}`);
+      } else {
+        console.warn(`⚠️ 모든 OpenAPI 키가 비활성화되었습니다.`);
+      }
     }
+  }
+
+  // 키 복구 시도 (429 에러 후 일정 시간 후 재활성화)
+  tryReactivateKey(keyId: string) {
+    const key = this.apiKeys.find(k => k.id === keyId);
+    if (key && !key.isActive) {
+      // 1시간 후 재활성화 시도
+      setTimeout(() => {
+        if (key.dailyUsage < this.DAILY_LIMIT) {
+          key.isActive = true;
+          console.log(`🔄 OpenAPI 키 ${key.name} (ID: ${key.id}) 재활성화 시도`);
+        }
+      }, 60 * 60 * 1000); // 1시간
+    }
+  }
+
+  // 스마트 키 선택 (에러율, 응답시간 등을 고려)
+  getSmartApiKey(): OpenApiKeyInfo | null {
+    const availableKeys = this.apiKeys.filter(key => key.isActive && key.dailyUsage < this.DAILY_LIMIT);
+    
+    if (availableKeys.length === 0) {
+      return null;
+    }
+
+    // 사용량이 적고, 최근에 사용하지 않은 키 우선 선택
+    return availableKeys.sort((a, b) => {
+      // 1순위: 사용량이 적은 키
+      if (a.dailyUsage !== b.dailyUsage) {
+        return a.dailyUsage - b.dailyUsage;
+      }
+      // 2순위: 오래 전에 사용한 키
+      return a.lastUsed - b.lastUsed;
+    })[0];
   }
 
   getApiKeyStatus(): OpenApiKeyInfo[] {
