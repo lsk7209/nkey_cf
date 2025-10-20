@@ -1,10 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 import { ProcessedKeywordData } from './naver-api';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// 환경변수 확인
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 빌드 시에는 더미 클라이언트를 생성하여 에러 방지
+let supabaseClient: any = null;
+
+if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here') {
+  try {
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false
+      }
+    });
+  } catch (error) {
+    console.warn('Supabase 클라이언트 생성 실패:', error);
+  }
+}
+
+export const supabase = supabaseClient;
 
 export interface KeywordCollection {
   id: string;

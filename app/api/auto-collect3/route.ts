@@ -21,7 +21,7 @@ async function filterDuplicateKeywords(keywordDetails: any[]) {
     return keywordDetails // 오류 시 모든 키워드 반환
   }
   
-  const existingKeywordSet = new Set(existingKeywords?.map(item => item.keyword) || [])
+  const existingKeywordSet = new Set(existingKeywords?.map((item: any) => item.keyword) || [])
   
   // 중복되지 않은 키워드만 필터링
   const filteredKeywords = keywordDetails.filter(detail => !existingKeywordSet.has(detail.keyword))
