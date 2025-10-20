@@ -1,20 +1,7 @@
 import CryptoJS from 'crypto-js';
 import { ApiKeyManager } from './api-key-manager'
 import { ProcessedKeywordData, NaverApiResponse, NaverKeywordData } from '@/types';
-
-export interface NaverKeywordData {
-  relKeyword: string;
-  monthlyPcQcCnt: string;
-  monthlyMobileQcCnt: string;
-  monthlyAvePcClkCnt: string;
-  monthlyAveMobileClkCnt: string;
-  monthlyAvePcCtr: string;
-  monthlyAveMobileCtr: string;
-  plAvgDepth: string;
-  compIdx: string;
-}
-
-// 타입은 types/index.ts에서 import
+// NaverKeywordData 타입은 '@/types'에서만 관리합니다. (중복 선언 제거)
 
 export class NaverKeywordAPI {
   private baseUrl: string;
