@@ -13,7 +13,10 @@ export class NaverKeywordAPI {
   }
 
   private generateSignature(timestamp: string, method: string, uri: string, secret: string): string {
-    const message = `${timestamp}.${method}.${uri}`;
+    // URI는 쿼리스트링 제외하고 순수 경로만 사용
+    const cleanUri = uri.split('?')[0];
+    const message = `${timestamp}.${method}.${cleanUri}`;
+    console.log(`🔐 시그니처 생성 메시지: ${message}`);
     const signature = CryptoJS.HmacSHA256(message, secret);
     return CryptoJS.enc.Base64.stringify(signature);
   }
@@ -108,9 +111,9 @@ export class NaverKeywordAPI {
       const baseDelay = 1000 // 1초
       
       try {
-        // AbortController로 타임아웃 설정
+        // AbortController로 타임아웃 설정 (RelKwdStat는 느릴 수 있으므로 60초)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30초 타임아웃
+        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60초 타임아웃
         
         console.log(`🌐 네이버 API 요청 시작: ${url}`)
         const response = await fetch(url, {
@@ -128,7 +131,8 @@ export class NaverKeywordAPI {
         if (response.status === 429) {
           // 해당 API 키 비활성화
           this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
-          throw new Error('API 호출 한도 초과. 잠시 후 다시 시도해주세요.');
+          console.warn(`⚠️ API 호출 한도 초과 (429). 5분 대기 후 재시도 권고`);
+          throw new Error('API 호출 한도 초과. 5분 대기 후 다시 시도해주세요.');
         }
 
         if (!response.ok) {
@@ -470,10 +474,15 @@ export class NaverKeywordAPI {
           break;
         }
         
-        // 재시도 전 대기 (지수 백오프)
+        // 재시도 전 대기 (지수 백오프, 429 에러 시 5분 대기)
         if (attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          console.warn(`키워드 "${keyword}" ${attempt}차 시도 실패, ${delay}ms 후 재시도:`, error);
+          let delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          if (error.message.includes('한도 초과')) {
+            delay = 300000; // 5분 대기
+            console.warn(`키워드 "${keyword}" 429 에러로 인한 5분 대기`);
+          } else {
+            console.warn(`키워드 "${keyword}" ${attempt}차 시도 실패, ${delay}ms 후 재시도:`, error);
+          }
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
