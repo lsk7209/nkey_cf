@@ -61,18 +61,18 @@ async function executeManualCollect(seedKeyword: string) {
     console.log(`📡 NaverDocumentAPI 인스턴스 생성 중...`)
     const documentAPI = new NaverDocumentAPI()
 
-    // 연관키워드 수집
-    console.log(`🔍 시드키워드 "${seedKeyword}" 연관키워드 수집 시작...`)
-    const relatedKeywords = await naverAPI.getRelatedKeywords(seedKeyword)
-    console.log(`📊 연관키워드 수집 결과: ${relatedKeywords.length}개`)
+    // 🧪 더미 데이터 테스트 (네이버 API 우회)
+    console.log(`🧪 더미 데이터 테스트 모드 시작`)
+    const relatedKeywords = [
+      `${seedKeyword} 추천`,
+      `${seedKeyword} 예약`,
+      `${seedKeyword} 가격`,
+      `${seedKeyword} 리뷰`,
+      `${seedKeyword} 후기`
+    ]
     
-    if (relatedKeywords.length === 0) {
-      console.log(`⚠️ 시드키워드 "${seedKeyword}" 연관키워드 없음`)
-      return
-    }
-
-    console.log(`✅ 시드키워드 "${seedKeyword}" 연관키워드 ${relatedKeywords.length}개 수집됨`)
-    console.log(`📝 연관키워드 목록:`, relatedKeywords.slice(0, 5)) // 처음 5개만 로그
+    console.log(`📊 더미 연관키워드 생성: ${relatedKeywords.length}개`)
+    console.log(`📝 더미 키워드 목록:`, relatedKeywords)
 
     // 🚀 고성능 병렬 처리: 다중 API 키 활용 + 메모리 최적화 + 실시간 배치 저장
     const batchSize = 10 // 배치 크기 더 축소 (안정성 우선)
@@ -90,36 +90,30 @@ async function executeManualCollect(seedKeyword: string) {
     console.log(`🧪 테스트 키워드:`, testKeywords)
 
     try {
-      // 1. 키워드 통계 수집 (단일 키워드)
-      console.log(`📊 키워드 통계 수집 시작...`)
-      const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 1)
-      console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
-      totalProcessedCount += keywordStats.length
+      // 🧪 더미 키워드 데이터 생성 (API 호출 우회)
+      console.log(`🧪 더미 키워드 데이터 생성 시작...`)
+      const batchKeywordDetails: KeywordDetail[] = testKeywords.map(keyword => ({
+        keyword: keyword,
+        pc_search: Math.floor(Math.random() * 1000) + 100,
+        mobile_search: Math.floor(Math.random() * 2000) + 200,
+        total_search: Math.floor(Math.random() * 3000) + 300,
+        monthly_click_pc: Math.floor(Math.random() * 100) + 10,
+        monthly_click_mobile: Math.floor(Math.random() * 200) + 20,
+        ctr_pc: Math.random() * 5 + 1,
+        ctr_mobile: Math.random() * 8 + 2,
+        ad_count: Math.floor(Math.random() * 50) + 5,
+        comp_idx: 'MEDIUM',
+        raw_json: JSON.stringify({ test: true }),
+        fetched_at: new Date().toISOString(),
+        blog_count: Math.floor(Math.random() * 500) + 50,
+        news_count: Math.floor(Math.random() * 100) + 10,
+        webkr_count: Math.floor(Math.random() * 1000) + 100,
+        cafe_count: Math.floor(Math.random() * 300) + 30
+      }))
       
-      if (keywordStats.length === 0) {
-        console.log(`⚠️ 키워드 통계 수집 실패`)
-        return
-      }
-
-      // 2. 문서수 수집 (단일 키워드)
-      console.log(`📄 문서수 수집 시작...`)
-      const keywordsForDocs = keywordStats.map(stat => stat.keyword)
-      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 1)
-      console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
-      
-      // 3. 데이터 통합
-      const batchKeywordDetails: KeywordDetail[] = keywordStats.map(stat => {
-        const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 }
-        return {
-          ...stat,
-          blog_count: docCounts.blog,
-          news_count: docCounts.news,
-          webkr_count: docCounts.webkr,
-          cafe_count: docCounts.cafe
-        }
-      })
-      
-      console.log(`🔗 데이터 통합 완료:`, batchKeywordDetails.length, '개')
+      totalProcessedCount += batchKeywordDetails.length
+      console.log(`🧪 더미 데이터 생성 완료:`, batchKeywordDetails.length, '개')
+      console.log(`📊 더미 데이터 샘플:`, batchKeywordDetails[0])
       
       // 4. 데이터베이스에 저장 (중복 키워드 처리 포함)
       if (batchKeywordDetails.length > 0) {
