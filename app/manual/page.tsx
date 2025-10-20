@@ -97,7 +97,7 @@ export default function ManualCollectPage() {
         try {
           console.log(`시드키워드 "${seedKeyword}" 수집 시작...`)
           
-          // 네이버 API를 통해 연관키워드 수집 (실시간 배치 저장)
+          // 네이버 API를 통해 연관키워드 수집 (즉시 응답)
           const response = await fetch('/api/manual-collect', {
             method: 'POST',
             headers: {
@@ -112,18 +112,26 @@ export default function ManualCollectPage() {
           }
 
           const data = await response.json()
-          allKeywords.push(...data.keywords)
-          totalSavedCount += data.savedCount || 0
-          totalProcessedCount += data.processedCount || 0
           
-          // 실시간으로 결과 업데이트
-          setKeywords([...allKeywords])
-          
-          console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.savedCount}개 저장됨`)
+          if (data.status === 'started') {
+            console.log(`시드키워드 "${seedKeyword}" 수집 시작됨 (백그라운드 처리 중)`)
+            // 백그라운드에서 처리되므로 즉시 완료로 표시
+            console.log(`시드키워드 "${seedKeyword}" 수집 완료: 백그라운드 처리 중`)
+          } else {
+            // 기존 방식 (즉시 완료)
+            allKeywords.push(...(data.keywords || []))
+            totalSavedCount += data.savedCount || 0
+            totalProcessedCount += data.processedCount || 0
+            
+            // 실시간으로 결과 업데이트
+            setKeywords([...allKeywords])
+            
+            console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.savedCount}개 저장됨`)
+          }
           
           // API 제한을 고려한 대기 (429 에러 방지)
           if (i < keywordList.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            await new Promise(resolve => setTimeout(resolve, 2000)) // 2초 대기
           }
         } catch (err) {
           console.error(`키워드 "${seedKeyword}" 수집 실패:`, err)
