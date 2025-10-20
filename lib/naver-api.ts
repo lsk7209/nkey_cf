@@ -477,7 +477,7 @@ export class NaverKeywordAPI {
         // 재시도 전 대기 (지수 백오프, 429 에러 시 5분 대기)
         if (attempt < maxRetries) {
           let delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          if (error.message.includes('한도 초과')) {
+          if (error instanceof Error && error.message.includes('한도 초과')) {
             delay = 300000; // 5분 대기
             console.warn(`키워드 "${keyword}" 429 에러로 인한 5분 대기`);
           } else {
