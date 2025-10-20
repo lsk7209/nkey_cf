@@ -163,7 +163,7 @@ async function executeAutoCollect3(seedCount: number, keywordsPerSeed: number) {
     console.log('📋 시드키워드 조회 완료:', availableKeywords?.length || 0, '개')
     
     if (availableKeywords && availableKeywords.length > 0) {
-      console.log('📋 시드키워드 목록:', availableKeywords.map(k => `${k.keyword}(${k.total_search})`).join(', '))
+      console.log('📋 시드키워드 목록:', availableKeywords.map((k: any) => `${k.keyword}(${k.total_search})`).join(', '))
     }
 
     if (fetchError) {
