@@ -74,7 +74,7 @@ export class NaverDocumentAPI {
         const nextKey = this.openApiKeyManager.getSmartApiKey();
         if (nextKey) {
           console.log(`🔄 다른 키로 자동 전환: ${nextKey.name}`);
-          return await this.searchDocumentsWithKey(keyword, service, nextKey);
+          return await this.searchDocumentsWithKey(query, service, nextKey);
         }
         
         return 0;
