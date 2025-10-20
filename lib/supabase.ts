@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { ProcessedKeywordData } from './naver-api';
+import { ProcessedKeywordData } from '@/types';
 
 // 환경변수 확인
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
