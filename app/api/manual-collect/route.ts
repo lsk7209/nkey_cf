@@ -115,6 +115,7 @@ async function executeManualCollect(seedKeyword: string) {
 
     let totalSavedCount = 0
     let totalProcessedCount = 0
+    let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
     const totalBatches = Math.ceil(relatedKeywords.length / batchSize)
 
     console.log(`🚀 간단한 테스트 모드 시작: ${relatedKeywords.length}개 키워드를 ${totalBatches}개 배치로 처리`)
@@ -154,7 +155,7 @@ async function executeManualCollect(seedKeyword: string) {
       console.log(`📄 문서수 데이터:`, Object.fromEntries(documentCountsMap))
       
       // 3. 데이터 통합
-      const batchKeywordDetails: KeywordDetail[] = keywordStats.map(stat => {
+      batchKeywordDetails = keywordStats.map(stat => {
         const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 }
         return {
           ...stat,
@@ -205,11 +206,36 @@ async function executeManualCollect(seedKeyword: string) {
     const successRate = totalProcessedCount > 0 ? ((totalSavedCount / totalProcessedCount) * 100).toFixed(1) : '0'
     console.log(`🎉 수동수집 완료! 시드키워드: "${seedKeyword}", 총 처리: ${totalProcessedCount}개, 저장: ${totalSavedCount}개, 성공률: ${successRate}%`)
 
+    // 프론트엔드에서 사용할 수 있도록 KeywordData 형태로 변환
+    const frontendKeywords = batchKeywordDetails.map((detail, index) => ({
+      id: `temp_${Date.now()}_${index}`, // 임시 ID
+      seed_keyword: seedKeyword,
+      keyword: detail.keyword,
+      pc_search: detail.pc_search,
+      mobile_search: detail.mobile_search,
+      total_search: detail.total_search,
+      monthly_click_pc: detail.monthly_click_pc,
+      monthly_click_mobile: detail.monthly_click_mobile,
+      ctr_pc: detail.ctr_pc,
+      ctr_mobile: detail.ctr_mobile,
+      ad_count: detail.ad_count,
+      comp_idx: detail.comp_idx,
+      blog_count: detail.blog_count || 0,
+      news_count: detail.news_count || 0,
+      webkr_count: detail.webkr_count || 0,
+      cafe_count: detail.cafe_count || 0,
+      is_used_as_seed: false,
+      raw_json: detail.raw_json,
+      fetched_at: detail.fetched_at,
+      created_at: new Date().toISOString()
+    }))
+
     return {
       success: true,
       processedCount: totalProcessedCount,
       savedCount: totalSavedCount,
-      successRate: parseFloat(successRate)
+      successRate: parseFloat(successRate),
+      keywords: frontendKeywords // 프론트엔드에서 필요한 키워드 데이터 추가
     }
 
   } catch (error: any) {
