@@ -144,9 +144,9 @@ async function executeManualCollect(seedKeyword: string) {
         }
       }
       
-    } catch (testError) {
+    } catch (testError: any) {
       console.error(`❌ 테스트 처리 실패:`, testError)
-      console.error(`❌ 테스트 오류 스택:`, testError.stack)
+      console.error(`❌ 테스트 오류 스택:`, testError?.stack)
     }
 
     const successRate = totalProcessedCount > 0 ? ((totalSavedCount / totalProcessedCount) * 100).toFixed(1) : '0'
