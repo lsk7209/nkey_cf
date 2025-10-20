@@ -8,6 +8,9 @@
     },
     "app/api/auto-collect/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/auto-collect3/route.ts": {
+      "maxDuration": 300
     }
   }
 }

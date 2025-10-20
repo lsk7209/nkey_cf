@@ -104,27 +104,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 백그라운드에서 자동수집3 실행
-    setTimeout(async () => {
-      try {
-        console.log('🚀 자동수집3 백그라운드 시작:', { seedCount, keywordsPerSeed })
-        await executeAutoCollect3(seedCount, keywordsPerSeed)
-      } catch (error) {
-        console.error('자동수집3 백그라운드 실행 오류:', error)
-        await updateAutoCollect3Status({
-          is_running: false,
-          end_time: new Date().toISOString(),
-          status_message: '자동수집3 실행 중 오류 발생',
-          error_message: (error as any)?.message || String(error)
-        })
-      }
-    }, 100)
-
-    return NextResponse.json({
-      message: '자동수집3이 백그라운드에서 시작되었습니다.',
+    // 즉시 자동수집3 실행 (Vercel 무료 플랜 대응)
+    console.log('🚀 자동수집3 즉시 실행 시작:', { seedCount, keywordsPerSeed })
+    
+    // 응답을 먼저 보내고 자동수집 실행
+    const responsePromise = NextResponse.json({
+      message: '자동수집3이 시작되었습니다.',
       seedCount,
       keywordsPerSeed
     })
+
+    // 자동수집 실행 (응답과 병렬로)
+    executeAutoCollect3(seedCount, keywordsPerSeed).catch(async (error) => {
+      console.error('자동수집3 실행 오류:', error)
+      await updateAutoCollect3Status({
+        is_running: false,
+        end_time: new Date().toISOString(),
+        status_message: '자동수집3 실행 중 오류 발생',
+        error_message: (error as any)?.message || String(error)
+      })
+    })
+
+    return responsePromise
 
   } catch (error: any) {
     console.error('자동수집3 API 오류:', error)
@@ -150,15 +151,20 @@ async function executeAutoCollect3(seedCount: number, keywordsPerSeed: number) {
   let seedsProcessed = 0
 
   try {
-    // 기존에 수집된 키워드 중 검색량이 높은 순으로 시드키워드 선택
+    // 기존에 수집된 키워드 중 시드로 사용되지 않은 키워드를 검색량 높은 순으로 선택
     console.log('📋 시드키워드 조회 시작...')
     const { data: availableKeywords, error: fetchError } = await supabase
       .from('manual_collection_results')
       .select('id, keyword, total_search')
+      .eq('is_used_as_seed', false) // 시드로 사용되지 않은 키워드만
       .order('total_search', { ascending: false })
       .limit(seedCount)
     
     console.log('📋 시드키워드 조회 완료:', availableKeywords?.length || 0, '개')
+    
+    if (availableKeywords && availableKeywords.length > 0) {
+      console.log('📋 시드키워드 목록:', availableKeywords.map(k => `${k.keyword}(${k.total_search})`).join(', '))
+    }
 
     if (fetchError) {
       console.error('시드키워드 조회 오류:', fetchError)
@@ -293,6 +299,18 @@ async function executeAutoCollect3(seedCount: number, keywordsPerSeed: number) {
           } catch (batchError) {
             console.error(`❌ 배치 ${batchIndex + 1} 처리 실패:`, batchError)
           }
+        }
+        
+        // 시드키워드 사용 완료 표시
+        const { error: updateSeedError } = await supabase
+          .from('manual_collection_results')
+          .update({ is_used_as_seed: true })
+          .eq('id', seedKeyword.id)
+
+        if (updateSeedError) {
+          console.error(`시드키워드 "${seedKeyword.keyword}" 사용 표시 실패:`, updateSeedError)
+        } else {
+          console.log(`✅ 시드키워드 "${seedKeyword.keyword}" 사용 완료 표시됨`)
         }
         
         console.log(`✅ 시드키워드 "${seedKeyword.keyword}" 처리 완료: ${totalKeywordsCollected}개 키워드 수집됨`)
