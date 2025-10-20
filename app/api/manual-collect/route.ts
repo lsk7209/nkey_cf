@@ -25,19 +25,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 즉시 응답 반환 (504 타임아웃 방지)
-    console.log(`🚀 수동수집 시작: "${seedKeyword}"`)
-    
-    // 백그라운드에서 수동수집 실행
-    executeManualCollect(seedKeyword).catch(async (error) => {
-      console.error(`❌ 수동수집 "${seedKeyword}" 실행 오류:`, error)
-    })
-
-    return NextResponse.json({
-      message: `수동수집이 시작되었습니다: "${seedKeyword}"`,
-      seedKeyword,
-      status: 'started'
-    })
+        console.log(`🚀 수동수집 시작: "${seedKeyword}"`)
+        
+        // 즉시 실행 (백그라운드 실행 방식 제거)
+        try {
+          const result = await executeManualCollect(seedKeyword)
+          return NextResponse.json({
+            message: `수동수집이 완료되었습니다: "${seedKeyword}"`,
+            seedKeyword,
+            status: 'completed',
+            result
+          })
+        } catch (error: any) {
+          console.error(`❌ 수동수집 "${seedKeyword}" 실행 오류:`, error)
+          return NextResponse.json({
+            message: `수동수집 중 오류가 발생했습니다: "${seedKeyword}"`,
+            seedKeyword,
+            status: 'error',
+            error: error?.message || String(error)
+          }, { status: 500 })
+        }
 
   } catch (error: any) {
     console.error('수동수집 API 오류:', error)
@@ -167,6 +174,13 @@ async function executeManualCollect(seedKeyword: string) {
     const successRate = totalProcessedCount > 0 ? ((totalSavedCount / totalProcessedCount) * 100).toFixed(1) : '0'
     console.log(`🎉 수동수집 완료! 시드키워드: "${seedKeyword}", 총 처리: ${totalProcessedCount}개, 저장: ${totalSavedCount}개, 성공률: ${successRate}%`)
 
+    return {
+      success: true,
+      processedCount: totalProcessedCount,
+      savedCount: totalSavedCount,
+      successRate: parseFloat(successRate)
+    }
+
   } catch (error: any) {
     console.error(`❌ 수동수집 "${seedKeyword}" 실행 중 오류:`, error)
     console.error(`❌ 오류 스택:`, error.stack)
@@ -175,5 +189,7 @@ async function executeManualCollect(seedKeyword: string) {
       message: error.message,
       cause: error.cause
     })
+    
+    throw error // 오류를 다시 던져서 상위에서 처리하도록 함
   }
 }

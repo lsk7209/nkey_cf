@@ -111,23 +111,32 @@ export default function ManualCollectPage() {
             throw new Error(errorData.message || '키워드 수집에 실패했습니다.')
           }
 
-          const data = await response.json()
-          
-          if (data.status === 'started') {
-            console.log(`시드키워드 "${seedKeyword}" 수집 시작됨 (백그라운드 처리 중)`)
-            // 백그라운드에서 처리되므로 즉시 완료로 표시
-            console.log(`시드키워드 "${seedKeyword}" 수집 완료: 백그라운드 처리 중`)
-          } else {
-            // 기존 방식 (즉시 완료)
-            allKeywords.push(...(data.keywords || []))
-            totalSavedCount += data.savedCount || 0
-            totalProcessedCount += data.processedCount || 0
+            const data = await response.json()
             
-            // 실시간으로 결과 업데이트
-            setKeywords([...allKeywords])
-            
-            console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.savedCount}개 저장됨`)
-          }
+            if (data.status === 'completed') {
+              // 즉시 실행 완료
+              allKeywords.push(...(data.result?.keywords || []))
+              totalSavedCount += data.result?.savedCount || 0
+              totalProcessedCount += data.result?.processedCount || 0
+              
+              // 실시간으로 결과 업데이트
+              setKeywords([...allKeywords])
+              
+              console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.result?.savedCount || 0}개 저장됨`)
+            } else if (data.status === 'error') {
+              console.error(`시드키워드 "${seedKeyword}" 수집 실패:`, data.error)
+              setError(`키워드 "${seedKeyword}" 수집 실패: ${data.error}`)
+            } else {
+              // 기존 방식 (즉시 완료)
+              allKeywords.push(...(data.keywords || []))
+              totalSavedCount += data.savedCount || 0
+              totalProcessedCount += data.processedCount || 0
+              
+              // 실시간으로 결과 업데이트
+              setKeywords([...allKeywords])
+              
+              console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.savedCount}개 저장됨`)
+            }
           
           // API 제한을 고려한 대기 (429 에러 방지)
           if (i < keywordList.length - 1) {
