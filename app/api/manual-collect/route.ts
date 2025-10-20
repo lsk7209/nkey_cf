@@ -53,20 +53,26 @@ export async function POST(request: NextRequest) {
 
 // 백그라운드에서 실행되는 수동수집 함수
 async function executeManualCollect(seedKeyword: string) {
+  console.log(`🔍 수동수집 디버깅 시작: "${seedKeyword}"`)
+  
   try {
+    console.log(`📡 NaverKeywordAPI 인스턴스 생성 중...`)
     const naverAPI = new NaverKeywordAPI()
+    console.log(`📡 NaverDocumentAPI 인스턴스 생성 중...`)
     const documentAPI = new NaverDocumentAPI()
 
     // 연관키워드 수집
-    console.log(`시드키워드 "${seedKeyword}" 연관키워드 수집 시작...`)
+    console.log(`🔍 시드키워드 "${seedKeyword}" 연관키워드 수집 시작...`)
     const relatedKeywords = await naverAPI.getRelatedKeywords(seedKeyword)
+    console.log(`📊 연관키워드 수집 결과: ${relatedKeywords.length}개`)
     
     if (relatedKeywords.length === 0) {
-      console.log(`시드키워드 "${seedKeyword}" 연관키워드 없음`)
+      console.log(`⚠️ 시드키워드 "${seedKeyword}" 연관키워드 없음`)
       return
     }
 
-    console.log(`시드키워드 "${seedKeyword}" 연관키워드 ${relatedKeywords.length}개 수집됨`)
+    console.log(`✅ 시드키워드 "${seedKeyword}" 연관키워드 ${relatedKeywords.length}개 수집됨`)
+    console.log(`📝 연관키워드 목록:`, relatedKeywords.slice(0, 5)) // 처음 5개만 로그
 
     // 🚀 고성능 병렬 처리: 다중 API 키 활용 + 메모리 최적화 + 실시간 배치 저장
     const batchSize = 50 // 배치 크기 축소 (타임아웃 방지)
@@ -143,5 +149,11 @@ async function executeManualCollect(seedKeyword: string) {
 
   } catch (error: any) {
     console.error(`❌ 수동수집 "${seedKeyword}" 실행 중 오류:`, error)
+    console.error(`❌ 오류 스택:`, error.stack)
+    console.error(`❌ 오류 상세:`, {
+      name: error.name,
+      message: error.message,
+      cause: error.cause
+    })
   }
 }
