@@ -112,6 +112,7 @@ export class NaverKeywordAPI {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 30000) // 30초 타임아웃
         
+        console.log(`🌐 네이버 API 요청 시작: ${url}`)
         const response = await fetch(url, {
           method: 'GET',
           headers,
@@ -119,6 +120,7 @@ export class NaverKeywordAPI {
         })
 
         clearTimeout(timeoutId)
+        console.log(`📡 네이버 API 응답 수신: ${response.status} ${response.statusText}`)
 
         // API 사용량 증가
         this.apiKeyManager.incrementUsage(apiKeyInfo.id);
@@ -136,6 +138,7 @@ export class NaverKeywordAPI {
 
         const data: NaverApiResponse = await response.json();
         console.log(`✅ API 호출 성공: ${data?.keywordList?.length || 0}개 키워드 응답`)
+        console.log(`📊 응답 데이터 샘플:`, data?.keywordList?.slice(0, 2))
         return data;
         
       } catch (error: any) {
@@ -156,7 +159,13 @@ export class NaverKeywordAPI {
         }
         
         // 최대 재시도 횟수 초과 또는 재시도 불가능한 에러
-        console.error(`네이버 API 호출 최종 실패: ${error.message}`)
+        console.error(`❌ 네이버 API 호출 최종 실패: ${error.message}`)
+        console.error(`❌ 오류 상세:`, {
+          name: error.name,
+          code: error.code,
+          message: error.message,
+          stack: error.stack
+        })
         throw error
       }
     }
