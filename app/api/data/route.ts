@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 필터링 결과:', {
       totalCount: count,
       returnedData: data?.length || 0,
-      sampleData: data?.slice(0, 3).map(item => ({
+      sampleData: data?.slice(0, 3).map((item: any) => ({
         keyword: item.keyword,
         total_search: item.total_search,
         cafe_count: item.cafe_count
