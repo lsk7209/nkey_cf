@@ -193,15 +193,15 @@ async function executeManualCollect(seedKeyword: string) {
             
             if (result.success) {
               totalSavedCount += result.savedCount
-              console.log(`✅ 배치 ${batchIndex + 1} 저장 성공:`, result.savedCount, '개`)
+              console.log('✅ 배치', batchIndex + 1, '저장 성공:', result.savedCount, '개')
             } else {
-              console.error(`❌ 배치 ${batchIndex + 1} 저장 실패:`, result.error)
+              console.error('❌ 배치', batchIndex + 1, '저장 실패:', result.error)
             }
           } else {
-            console.log(`⏭️ 배치 ${batchIndex + 1} 모든 키워드가 중복이므로 패스`)
+            console.log('⏭️ 배치', batchIndex + 1, '모든 키워드가 중복이므로 패스')
           }
         } else {
-          console.log(`⚠️ 배치 ${batchIndex + 1} 저장할 키워드 데이터가 없음`)
+          console.log('⚠️ 배치', batchIndex + 1, '저장할 키워드 데이터가 없음')
         }
         
         // 배치 간 대기 (API 제한 방지)
