@@ -7,11 +7,20 @@
 2. 계정 생성 또는 로그인
 3. 무료 플랜으로 시작 (Workers, Pages, D1, R2, KV 모두 무료 제공)
 
-### 1.2 API 토큰 생성
+### 1.2 최신 대시보드 네비게이션 (2025년 업데이트)
+**중요**: 최신 Cloudflare 대시보드에서는 메뉴 구조가 변경되었습니다!
+
+#### 새로운 메뉴 구조:
+- **"Workers"** → **"Workers & Pages"**로 통합
+- **"Create a Worker"** → **"Create a Service"**로 변경
+- 좌측 메뉴에서 **"Workers & Pages"** 찾기
+- 없으면 **"Workers"** 메뉴 직접 클릭
+
+### 1.3 API 토큰 생성 (2025년 업데이트)
 1. **My Profile** → **API Tokens** 이동
 2. **Create Token** 클릭
 3. **Custom token** 선택
-4. 다음 권한 설정:
+4. 다음 권한 설정 (최신 권한 구조):
    ```
    Account: Cloudflare Pages:Edit
    Account: Cloudflare Workers:Edit
@@ -21,7 +30,29 @@
 5. **Continue to summary** → **Create Token**
 6. 토큰 복사하여 안전한 곳에 저장
 
-### 1.3 Account ID 확인
+### 1.4 대시보드 접근 방법 (문제 해결)
+**Workers 메뉴가 보이지 않는 경우:**
+
+#### 방법 1: 직접 URL 접근
+```
+https://dash.cloudflare.com/workers
+또는
+https://dash.cloudflare.com/workers/overview
+```
+
+#### 방법 2: Wrangler CLI 사용 (가장 확실한 방법)
+```bash
+# Wrangler 설치
+npm install -g wrangler
+
+# Cloudflare 로그인
+wrangler login
+
+# 계정 정보 확인
+wrangler whoami
+```
+
+### 1.5 Account ID 확인
 1. 대시보드 우측 사이드바에서 **Account ID** 복사
 
 ## 2. D1 데이터베이스 설정
@@ -94,15 +125,20 @@ wrangler kv:namespace list
 
 ## 5. Pages 프로젝트 설정
 
-### 5.1 Pages 프로젝트 생성
-1. Cloudflare 대시보드 → **Pages**
+### 5.1 Pages 프로젝트 생성 (2025년 업데이트)
+1. Cloudflare 대시보드 → **Workers & Pages** (또는 **Pages**)
 2. **Create a project** 클릭
 3. **Connect to Git** 선택
 4. GitHub 저장소 연결: `lsk7209/nkey_cf`
 5. 프로젝트 이름: `nkey-cf`
 6. **Save and Deploy** 클릭
 
-### 5.2 빌드 설정
+### 5.2 최신 Pages 인터페이스 변경사항
+- **"Pages"** 메뉴가 **"Workers & Pages"**로 통합
+- **"Create a project"** → **"Create a project"** (변경 없음)
+- **"Connect to Git"** → **"Connect to Git"** (변경 없음)
+
+### 5.3 빌드 설정
 - **Framework preset**: Next.js
 - **Build command**: `npm run build`
 - **Build output directory**: `.vercel/output/static`
@@ -110,13 +146,18 @@ wrangler kv:namespace list
 
 ## 6. Workers 설정
 
-### 6.1 Workers 배포
+### 6.1 Workers 배포 (2025년 업데이트)
 ```bash
 # Workers 배포
 wrangler deploy
 ```
 
-### 6.2 Cron 트리거 설정
+### 6.2 최신 Workers 인터페이스 변경사항
+- **"Create a Worker"** → **"Create a Service"**로 변경
+- **"Workers"** → **"Workers & Pages"**로 통합
+- **"Triggers"** → **"Triggers"** (변경 없음)
+
+### 6.3 Cron 트리거 설정
 1. Cloudflare 대시보드 → **Workers & Pages**
 2. 생성된 Worker 선택
 3. **Triggers** 탭 → **Cron Triggers**
