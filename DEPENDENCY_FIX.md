@@ -11,12 +11,16 @@ npm error Found: next@14.0.0
 
 ### ✅ 해결 방법
 
-#### 1. Next.js 버전 업그레이드
+#### 1. 안정적인 버전 사용
 ```json
 // package.json
 {
   "dependencies": {
-    "next": "^14.3.0"  // 14.0.0 → 14.3.0으로 업그레이드
+    "next": "14.0.0"  // 안정적인 버전 사용
+  },
+  "devDependencies": {
+    "eslint-config-next": "14.0.0",  // Next.js와 동일한 버전
+    "@cloudflare/next-on-pages": "^1.12.0"  // 호환되는 버전
   }
 }
 ```
