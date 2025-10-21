@@ -250,11 +250,7 @@ async function executeAutoCollect3(seedCount: number, keywordsPerSeed: number, d
         
         // 시드키워드 사용 완료 표시
         try {
-          await d1Client.db.prepare(`
-            UPDATE manual_collection_results 
-            SET is_used_as_seed = true 
-            WHERE id = ?
-          `).bind(seedKeyword.id).run()
+          await d1Client.markSeedAsUsed(seedKeyword.id)
           console.log(`✅ 시드키워드 "${seedKeyword.keyword}" 사용 완료 표시됨`)
         } catch (updateSeedError) {
           console.error(`시드키워드 "${seedKeyword.keyword}" 사용 표시 실패:`, updateSeedError)

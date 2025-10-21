@@ -210,4 +210,17 @@ export class D1Client {
       return [];
     }
   }
+
+  // 시드키워드 사용 완료 표시
+  async markSeedAsUsed(seedId: number) {
+    try {
+      await this.db.prepare(`
+        UPDATE manual_collection_results 
+        SET is_used_as_seed = true, updated_at = ?
+        WHERE id = ?
+      `).bind(new Date().toISOString(), seedId).run();
+    } catch (error) {
+      console.error('시드키워드 사용 완료 표시 실패:', error);
+    }
+  }
 }
