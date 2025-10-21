@@ -168,7 +168,7 @@ async function executeManualCollect(seedKeyword: string) {
       
       const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 2) // 동시성 2로 증가
       console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
-      console.log(`📄 문서수 데이터 샘플:`, Object.fromEntries([...documentCountsMap.entries()].slice(0, 3))) // 처음 3개만 로그
+      console.log(`📄 문서수 데이터 샘플:`, Object.fromEntries(Array.from(documentCountsMap.entries()).slice(0, 3))) // 처음 3개만 로그
       
       // 3. 데이터 통합
       batchKeywordDetails = keywordStats.map(stat => {
