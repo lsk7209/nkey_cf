@@ -1,4 +1,18 @@
 // Cron Worker: 매 정시 실행 (09-20시 사이 12회 포스팅)
+
+
+// Cloudflare Workers 타입 정의
+interface ScheduledEvent {
+  type: 'scheduled';
+  scheduledTime: number;
+  cron: string;
+}
+
+interface ExecutionContext {
+  waitUntil(promise: Promise<any>): void;
+  passThroughOnException(): void;
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext): Promise<void> {
     const now = new Date();
@@ -131,12 +145,12 @@ async function executeAutoCollect3(env: any) {
             
             try {
               // 키워드 상세 정보 수집
-              const keywordDetails = await naverAPI.getKeywordDetails(batch);
+              const keywordDetails: any[] = await naverAPI.getKeywordDetails(batch);
               
               if (keywordDetails && keywordDetails.length > 0) {
                 // 문서수 수집
-                const docCounts = await documentAPI.getDocumentCounts(
-                  keywordDetails.map(k => k.keyword)
+                const docCounts: any = await documentAPI.getDocumentCounts(
+                  keywordDetails.map((k: any) => k.keyword)
                 );
                 
                 // 데이터베이스에 저장
@@ -180,11 +194,7 @@ async function executeAutoCollect3(env: any) {
         
         // 시드키워드 사용 완료 표시
         try {
-          await d1Client.db.prepare(`
-            UPDATE manual_collection_results 
-            SET is_used_as_seed = true 
-            WHERE id = ?
-          `).bind(seedKeyword.id).run();
+          await d1Client.markSeedAsUsed(seedKeyword.id);
           console.log(`✅ 시드키워드 "${seedKeyword.keyword}" 사용 완료 표시됨`);
         } catch (updateSeedError) {
           console.error(`시드키워드 "${seedKeyword.keyword}" 사용 표시 실패:`, updateSeedError);
@@ -365,6 +375,19 @@ class D1Client {
     } catch (error: any) {
       console.error('D1 저장 오류:', error);
       return { success: false, savedCount: 0, error: error.message };
+    }
+  }
+
+  // 시드키워드 사용 완료 표시
+  async markSeedAsUsed(seedId: number) {
+    try {
+      await this.db.prepare(`
+        UPDATE manual_collection_results 
+        SET is_used_as_seed = true, updated_at = ?
+        WHERE id = ?
+      `).bind(new Date().toISOString(), seedId).run();
+    } catch (error) {
+      console.error('시드키워드 사용 완료 표시 실패:', error);
     }
   }
 }
