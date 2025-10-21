@@ -72,7 +72,7 @@ export default function Home() {
               web_count: 9410,
               total_docs: 58480,
               potential_score: 19.1,
-              source: 'fresh'
+              source: 'fresh' as const
             },
             {
               rel_keyword: `${keywordList[0]} 관련키워드2`,
@@ -88,7 +88,7 @@ export default function Home() {
               web_count: 5200,
               total_docs: 36850,
               potential_score: 18.5,
-              source: 'fresh'
+              source: 'fresh' as const
             }
           ]
         }
