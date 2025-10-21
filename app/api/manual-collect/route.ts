@@ -67,6 +67,21 @@ async function executeManualCollect(seedKeyword: string) {
     const naverAPI = new NaverKeywordAPI()
     console.log(`📡 NaverDocumentAPI 인스턴스 생성 중...`)
     const documentAPI = new NaverDocumentAPI()
+    
+    // Supabase 연결 상태 확인
+    console.log(`🔍 Supabase 연결 상태 확인 중...`)
+    const { supabase } = await import('@/lib/supabase')
+    if (!supabase) {
+      console.error(`❌ Supabase 클라이언트가 초기화되지 않음`)
+      return {
+        success: false,
+        processedCount: 0,
+        savedCount: 0,
+        successRate: 0,
+        error: 'Supabase 연결 실패'
+      }
+    }
+    console.log(`✅ Supabase 클라이언트 연결 확인됨`)
 
     // 연관키워드 수집 (실제 네이버 API 사용)
     console.log(`🔍 시드키워드 "${seedKeyword}" 연관키워드 수집 시작...`)
@@ -201,6 +216,19 @@ async function executeManualCollect(seedKeyword: string) {
     } catch (testError: any) {
       console.error(`❌ 테스트 처리 실패:`, testError)
       console.error(`❌ 테스트 오류 스택:`, testError?.stack)
+      console.error(`❌ 테스트 오류 상세:`, {
+        name: testError?.name,
+        message: testError?.message,
+        cause: testError?.cause
+      })
+      
+      return {
+        success: false,
+        processedCount: totalProcessedCount,
+        savedCount: totalSavedCount,
+        successRate: 0,
+        error: testError?.message || '처리 중 오류 발생'
+      }
     }
 
     const successRate = totalProcessedCount > 0 ? ((totalSavedCount / totalProcessedCount) * 100).toFixed(1) : '0'

@@ -123,6 +123,13 @@ export default function ManualCollectPage() {
               setKeywords([...allKeywords])
               
               console.log(`시드키워드 "${seedKeyword}" 수집 완료: ${data.result?.savedCount || 0}개 저장됨`)
+              console.log(`📊 수집 결과 상세:`, data.result)
+              
+              // 오류가 있는 경우 표시
+              if (data.result?.error) {
+                console.error(`⚠️ 수집 중 오류 발생:`, data.result.error)
+                setError(`키워드 "${seedKeyword}" 수집 중 오류: ${data.result.error}`)
+              }
             } else if (data.status === 'error') {
               console.error(`시드키워드 "${seedKeyword}" 수집 실패:`, data.error)
               setError(`키워드 "${seedKeyword}" 수집 실패: ${data.error}`)
