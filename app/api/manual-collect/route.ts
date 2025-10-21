@@ -133,20 +133,21 @@ async function executeManualCollect(seedKeyword: string) {
     let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
     const totalBatches = Math.ceil(relatedKeywords.length / batchSize)
 
-    console.log(`🚀 간단한 테스트 모드 시작: ${relatedKeywords.length}개 키워드를 ${totalBatches}개 배치로 처리`)
+    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 50개 처리`)
 
-    // 간단한 테스트: 첫 번째 키워드만 처리
-    const testKeywords = relatedKeywords.slice(0, 1)
-    console.log(`🧪 테스트 키워드:`, testKeywords)
+    // 연관키워드 모두 처리 (최대 50개로 제한하여 안정성 확보)
+    const testKeywords = relatedKeywords.slice(0, 50)
+    console.log(`🔍 처리할 키워드:`, testKeywords.length, '개')
+    console.log(`📝 키워드 목록:`, testKeywords.slice(0, 10)) // 처음 10개만 로그
 
     try {
-      // 1. 키워드 통계 수집 (단일 키워드)
+      // 1. 키워드 통계 수집 (배치 처리)
       console.log(`📊 키워드 통계 수집 시작...`)
-      console.log(`📝 수집할 키워드:`, testKeywords)
+      console.log(`📝 수집할 키워드:`, testKeywords.length, '개')
       
-      const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 1)
+      const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 3) // 동시성 3으로 증가
       console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
-      console.log(`📊 수집된 통계 데이터:`, keywordStats)
+      console.log(`📊 수집된 통계 데이터 샘플:`, keywordStats.slice(0, 3)) // 처음 3개만 로그
       totalProcessedCount += keywordStats.length
       
       if (keywordStats.length === 0) {
@@ -160,14 +161,14 @@ async function executeManualCollect(seedKeyword: string) {
         }
       }
 
-      // 2. 문서수 수집 (단일 키워드)
+      // 2. 문서수 수집 (배치 처리)
       console.log(`📄 문서수 수집 시작...`)
       const keywordsForDocs = keywordStats.map(stat => stat.keyword)
-      console.log(`📝 문서수 수집할 키워드:`, keywordsForDocs)
+      console.log(`📝 문서수 수집할 키워드:`, keywordsForDocs.length, '개')
       
-      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 1)
+      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 2) // 동시성 2로 증가
       console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
-      console.log(`📄 문서수 데이터:`, Object.fromEntries(documentCountsMap))
+      console.log(`📄 문서수 데이터 샘플:`, Object.fromEntries([...documentCountsMap.entries()].slice(0, 3))) // 처음 3개만 로그
       
       // 3. 데이터 통합
       batchKeywordDetails = keywordStats.map(stat => {
