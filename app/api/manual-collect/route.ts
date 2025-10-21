@@ -128,10 +128,10 @@ async function executeManualCollect(seedKeyword: string) {
     let totalProcessedCount = 0
     let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
 
-    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 500개 처리`)
+    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 50개 처리`)
 
-    // 연관키워드 처리 (최대 500개, 5개씩 배치 처리)
-    const allKeywords = relatedKeywords.slice(0, 500)
+    // 연관키워드 처리 (최대 50개, 5개씩 배치 처리)
+    const allKeywords = relatedKeywords.slice(0, 50)
     const batchSize = 5 // 5개씩 배치 처리 (타임아웃 방지)
     const totalBatches = Math.ceil(allKeywords.length / batchSize)
     
@@ -206,8 +206,8 @@ async function executeManualCollect(seedKeyword: string) {
         
         // 배치 간 대기 (API 제한 방지)
         if (batchIndex < totalBatches - 1) {
-          console.log(`⏳ 다음 배치 처리 전 5초 대기...`)
-          await new Promise(resolve => setTimeout(resolve, 5000))
+          console.log(`⏳ 다음 배치 처리 전 1초 대기...`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
         }
         
       } catch (batchError: any) {
