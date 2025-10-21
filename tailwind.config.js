@@ -13,12 +13,8 @@ module.exports = {
           500: '#3b82f6',
           600: '#2563eb',
           700: '#1d4ed8',
-        },
-        naver: {
-          green: '#03c75a',
-          dark: '#1ec800',
         }
-      },
+      }
     },
   },
   plugins: [],

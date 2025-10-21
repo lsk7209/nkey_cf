@@ -1,507 +1,154 @@
-import CryptoJS from 'crypto-js';
-import { ApiKeyManager } from './api-key-manager'
-import { ProcessedKeywordData, NaverApiResponse, NaverKeywordData } from '@/types';
-// NaverKeywordData 타입은 '@/types'에서만 관리합니다. (중복 선언 제거)
+// Naver SearchAd API 관련 유틸리티
 
-export class NaverKeywordAPI {
-  private baseUrl: string;
-  private apiKeyManager: ApiKeyManager;
+export interface SearchAdResponse {
+  keywordList: Array<{
+    relKeyword: string
+    monthlyPcQcCnt: number
+    monthlyMobileQcCnt: number
+    plAvgCpc: number
+    moAvgCpc: number
+    competition: string
+  }>
+}
 
-  constructor() {
-    this.baseUrl = process.env.SEARCHAD_BASE || 'https://api.naver.com';
-    this.apiKeyManager = new ApiKeyManager();
-  }
+export interface OpenApiResponse {
+  total: number
+  items: Array<{
+    title: string
+    link: string
+    description: string
+  }>
+}
 
-  private generateSignature(timestamp: string, method: string, uri: string, secret: string): string {
-    // URI는 쿼리스트링 제외하고 순수 경로만 사용
-    const cleanUri = uri.split('?')[0];
-    const message = `${timestamp}.${method}.${cleanUri}`;
-    console.log(`🔐 시그니처 생성 메시지: ${message}`);
-    const signature = CryptoJS.HmacSHA256(message, secret);
-    return CryptoJS.enc.Base64.stringify(signature);
-  }
+// HMAC-SHA256 시그니처 생성
+export async function generateSignature(
+  secret: string,
+  timestamp: string,
+  method: string,
+  uri: string
+): Promise<string> {
+  const message = `${timestamp}.${method}.${uri}`
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message))
+  return btoa(String.fromCharCode(...new Uint8Array(signature)))
+}
 
-  private normalizeNumber(value: any): number {
-    // null, undefined, 빈 문자열 체크
-    if (value === null || value === undefined || value === '') return 0;
-    
-    // 문자열로 변환
-    const stringValue = String(value);
-    
-    // "< 10" 같은 문자열 처리
-    if (stringValue.includes('<')) {
-      const match = stringValue.match(/< (\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    }
-    
-    // 숫자만 추출
-    const numericValue = stringValue.replace(/[^\d.-]/g, '');
-    return parseFloat(numericValue) || 0;
-  }
-
-  private processKeywordData(data: NaverKeywordData): ProcessedKeywordData {
-    // 데이터 유효성 검증
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid keyword data received from API');
-    }
-
-    const pcSearch = this.normalizeNumber(data.monthlyPcQcCnt);
-    const mobileSearch = this.normalizeNumber(data.monthlyMobileQcCnt);
-    const totalSearch = pcSearch + mobileSearch;
-
-    return {
-      keyword: data.relKeyword || '',
-      pc_search: pcSearch,
-      mobile_search: mobileSearch,
-      total_search: totalSearch,
-      monthly_click_pc: this.normalizeNumber(data.monthlyAvePcClkCnt),
-      monthly_click_mobile: this.normalizeNumber(data.monthlyAveMobileClkCnt),
-      ctr_pc: this.normalizeNumber(data.monthlyAvePcCtr),
-      ctr_mobile: this.normalizeNumber(data.monthlyAveMobileCtr),
-      ad_count: this.normalizeNumber(data.plAvgDepth),
-      comp_idx: data.compIdx || 'UNKNOWN',
-      raw_json: JSON.stringify(data),
-      fetched_at: new Date().toISOString(),
-    };
-  }
-
-  async getKeywords(hintKeywords: string[], showDetail: boolean = true): Promise<ProcessedKeywordData[]> {
-    if (hintKeywords.length === 0) {
-      throw new Error('최소 1개의 힌트 키워드가 필요합니다.');
-    }
-
-    if (hintKeywords.length > 5) {
-      throw new Error('최대 5개의 힌트 키워드만 허용됩니다.');
-    }
-
-    // 사용 가능한 API 키 가져오기
-    console.log(`🔑 API 키 조회 중...`)
-    const apiKeyInfo = this.apiKeyManager.getAvailableApiKey();
-    if (!apiKeyInfo) {
-      console.error(`❌ 사용 가능한 API 키가 없습니다.`)
-      throw new Error('사용 가능한 API 키가 없습니다.');
-    }
-    console.log(`🔑 API 키 선택됨: ${apiKeyInfo.name}`)
-
-    const timestamp = Date.now().toString();
-    const method = 'GET';
-    const uri = '/keywordstool';
-    const signature = this.generateSignature(timestamp, method, uri, apiKeyInfo.secret);
-
-    const params = new URLSearchParams({
-      hintKeywords: hintKeywords.join(','),
-      showDetail: showDetail ? '1' : '0',
-    });
-
-    const url = `${this.baseUrl}${uri}?${params.toString()}`;
-    console.log(`🌐 API 호출 URL: ${url}`)
-
-    const headers = {
-      'Content-Type': 'application/json; charset=UTF-8',
+// Naver SearchAd API 호출
+export async function callSearchAdAPI(
+  keywords: string[],
+  accessLicense: string,
+  secretKey: string,
+  customerId: string
+): Promise<SearchAdResponse> {
+  const timestamp = Date.now().toString()
+  const method = 'POST'
+  const uri = '/keywordstool'
+  
+  const signature = await generateSignature(secretKey, timestamp, method, uri)
+  
+  const response = await fetch('https://api.naver.com/keywordstool', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
       'X-Timestamp': timestamp,
-      'X-API-KEY': apiKeyInfo.apiKey,
-      'X-Customer': apiKeyInfo.customerId,
+      'X-API-KEY': accessLicense,
+      'X-Customer': customerId,
       'X-Signature': signature,
-    };
-    console.log(`📡 API 호출 시작: ${hintKeywords.join(', ')}`)
+    },
+    body: JSON.stringify({
+      hintKeywords: keywords,
+      showDetail: 1
+    })
+  })
 
-    // 재시도 로직이 포함된 fetch 함수
-    const fetchWithRetry = async (retryCount: number = 0): Promise<any> => {
-      const maxRetries = 3
-      const baseDelay = 1000 // 1초
-      
-      try {
-        // AbortController로 타임아웃 설정 (RelKwdStat는 느릴 수 있으므로 60초)
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60초 타임아웃
-        
-        console.log(`🌐 네이버 API 요청 시작: ${url}`)
-        const response = await fetch(url, {
-          method: 'GET',
-          headers,
-          signal: controller.signal
-        })
-
-        clearTimeout(timeoutId)
-        console.log(`📡 네이버 API 응답 수신: ${response.status} ${response.statusText}`)
-
-        // API 사용량 증가
-        this.apiKeyManager.incrementUsage(apiKeyInfo.id);
-
-        if (response.status === 429) {
-          // 해당 API 키 비활성화
-          this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
-          console.warn(`⚠️ API 호출 한도 초과 (429). 5분 대기 후 재시도 권고`);
-          throw new Error('API 호출 한도 초과. 5분 대기 후 다시 시도해주세요.');
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API 요청 실패: ${response.status} - ${errorText}`);
-        }
-
-        const data: NaverApiResponse = await response.json();
-        console.log(`✅ API 호출 성공: ${data?.keywordList?.length || 0}개 키워드 응답`)
-        console.log(`📊 응답 데이터 샘플:`, data?.keywordList?.slice(0, 2))
-        return data;
-        
-      } catch (error: any) {
-        // 네트워크 에러나 타임아웃 에러인 경우 재시도
-        if (retryCount < maxRetries && (
-          error.name === 'AbortError' || 
-          error.code === 'ETIMEDOUT' || 
-          error.code === 'ECONNRESET' ||
-          error.message.includes('fetch failed') ||
-          error.message.includes('network') ||
-          error.message.includes('socket')
-        )) {
-          const delay = baseDelay * Math.pow(2, retryCount) // 지수 백오프
-          console.warn(`네이버 API 호출 실패 (시도 ${retryCount + 1}/${maxRetries + 1}): ${error.message}, ${delay}ms 후 재시도`)
-          
-          await new Promise(resolve => setTimeout(resolve, delay))
-          return fetchWithRetry(retryCount + 1)
-        }
-        
-        // 최대 재시도 횟수 초과 또는 재시도 불가능한 에러
-        console.error(`❌ 네이버 API 호출 최종 실패: ${error.message}`)
-        console.error(`❌ 오류 상세:`, {
-          name: error.name,
-          code: error.code,
-          message: error.message,
-          stack: error.stack
-        })
-        throw error
-      }
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('API 호출 제한에 도달했습니다. 잠시 후 다시 시도해주세요.')
     }
-
-    try {
-      const data: NaverApiResponse = await fetchWithRetry();
-      
-      if (!data || !data.keywordList || !Array.isArray(data.keywordList)) {
-        console.warn('Invalid API response structure:', data);
-        return [];
-      }
-
-      return data.keywordList
-        .filter(item => item && typeof item === 'object') // 유효한 데이터만 필터링
-        .map(item => {
-          try {
-            return this.processKeywordData(item);
-          } catch (error) {
-            console.error('Error processing keyword data:', error, item);
-            return null;
-          }
-        })
-        .filter(item => item !== null) as ProcessedKeywordData[]; // null 값 제거
-    } catch (error) {
-      console.error('네이버 API 호출 오류:', error);
-      throw error;
-    }
+    throw new Error(`SearchAd API 오류: ${response.status}`)
   }
 
-  async getKeywordsBatch(keywords: string[], showDetail: boolean = true): Promise<ProcessedKeywordData[]> {
-    const results: ProcessedKeywordData[] = [];
-    const batchSize = 5;
+  return response.json()
+}
 
-    // 5개씩 배치로 나누어 처리
-    for (let i = 0; i < keywords.length; i += batchSize) {
-      const batch = keywords.slice(i, i + batchSize);
-      
-      try {
-        const batchResults = await this.getKeywords(batch, showDetail);
-        results.push(...batchResults);
-        
-        // RelKwdStat는 속도 제한이 엄격하므로 지연 추가
-        if (i + batchSize < keywords.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
-        }
-      } catch (error) {
-        console.error(`배치 ${i / batchSize + 1} 처리 중 오류:`, error);
-        
-        // 429 오류 시 더 긴 대기
-        if (error instanceof Error && error.message.includes('429')) {
-          await new Promise(resolve => setTimeout(resolve, 300000)); // 5분 대기
-        }
-      }
-    }
-
-    return results;
+// Naver OpenAPI 호출 (병렬)
+export async function callOpenAPI(
+  keyword: string,
+  clientId: string,
+  clientSecret: string
+): Promise<{
+  blog: number
+  cafe: number
+  news: number
+  web: number
+}> {
+  const baseUrl = 'https://openapi.naver.com/v1/search'
+  
+  const headers = {
+    'X-Naver-Client-Id': clientId,
+    'X-Naver-Client-Secret': clientSecret,
   }
 
-  // 시드키워드로부터 연관키워드 목록 가져오기 (상세 정보 없이)
-  async getRelatedKeywords(seedKeyword: string): Promise<string[]> {
-    try {
-      console.log(`🔍 연관키워드 수집 시작: "${seedKeyword}"`)
-      const allKeywords = new Set<string>();
-      
-      // 1차: 기본 연관키워드 수집
-      console.log(`📊 1차 수집 시작: "${seedKeyword}"`)
-      const primaryKeywords = await this.getKeywords([seedKeyword], false);
-      console.log(`📊 1차 수집 완료: ${primaryKeywords.length}개 키워드 수집됨`)
-      
-      primaryKeywords.forEach(k => allKeywords.add(k.keyword));
-      console.log(`1차 수집: ${allKeywords.size}개 키워드`);
-      
-      // API 키 상태 확인
-      const availableKeys = this.apiKeyManager.getApiKeyStatus().filter(key => key.isActive);
-      console.log(`사용 가능한 API 키: ${availableKeys.length}개`);
-      
-      if (availableKeys.length === 0) {
-        console.warn('사용 가능한 API 키가 없어 추가 수집을 중단합니다.');
-        return Array.from(allKeywords);
-      }
-      
-      // 2차: 수집된 키워드들을 다시 힌트로 사용하여 추가 키워드 수집 (순차 처리)
-      if (allKeywords.size > 0 && availableKeys.length > 0) {
-        const batchSize = 5; // API 제한에 맞춰 5개씩 처리
-        const keywordsArray = Array.from(allKeywords);
-        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 10); // 최대 10개 배치로 제한
-        
-        // 순차 처리로 API 한도 보호
-        for (let i = 0; i < maxBatches; i++) {
-          const batch = keywordsArray.slice(i * batchSize, (i + 1) * batchSize);
-          if (batch.length > 0) {
-            try {
-              const batchKeywords = await this.getKeywords(batch, false);
-              batchKeywords.forEach(k => {
-                if (k.keyword !== seedKeyword) {
-                  allKeywords.add(k.keyword);
-                }
-              });
-              console.log(`2차 배치 ${i + 1}/${maxBatches} 완료: ${allKeywords.size}개 키워드`);
-              
-              // API 호출 간격 조절 (300ms 대기)
-              await new Promise(resolve => setTimeout(resolve, 300));
-            } catch (error) {
-              console.error(`2차 배치 ${i + 1} 수집 실패:`, error);
-              // API 키 한도 초과 시 중단
-              if (error instanceof Error && error.message.includes('한도 초과')) {
-                console.warn('API 키 한도 초과로 2차 수집을 중단합니다.');
-                break;
-              }
-            }
-          }
-        }
-        console.log(`2차 수집 후 총 ${allKeywords.size}개 키워드`);
-      }
-      
-      // 3차: 2차에서 수집된 키워드들로 추가 수집 (순차 처리, 더 보수적)
-      if (allKeywords.size > 0 && availableKeys.length > 1) {
-        const keywordsArray = Array.from(allKeywords);
-        const batchSize = 5;
-        const maxBatches = Math.min(Math.ceil(keywordsArray.length / batchSize), 5); // 최대 5개 배치로 제한
-        
-        // 순차 처리로 API 한도 보호
-        for (let i = 0; i < maxBatches; i++) {
-          const batch = keywordsArray.slice(i * batchSize, (i + 1) * batchSize);
-          if (batch.length > 0) {
-            try {
-              const batchKeywords = await this.getKeywords(batch, false);
-              batchKeywords.forEach(k => {
-                if (k.keyword !== seedKeyword) {
-                  allKeywords.add(k.keyword);
-                }
-              });
-              console.log(`3차 배치 ${i + 1}/${maxBatches} 완료: ${allKeywords.size}개 키워드`);
-              
-              // API 호출 간격 조절 (500ms 대기)
-              await new Promise(resolve => setTimeout(resolve, 500));
-            } catch (error) {
-              console.error(`3차 배치 ${i + 1} 수집 실패:`, error);
-              // API 키 한도 초과 시 중단
-              if (error instanceof Error && error.message.includes('한도 초과')) {
-                console.warn('API 키 한도 초과로 3차 수집을 중단합니다.');
-                break;
-              }
-            }
-          }
-        }
-        console.log(`3차 수집 후 총 ${allKeywords.size}개 키워드`);
-      }
-      
-      return Array.from(allKeywords);
-    } catch (error) {
-      console.error('연관키워드 조회 실패:', error);
-      return [];
-    }
-  }
+  const [blogRes, cafeRes, newsRes, webRes] = await Promise.all([
+    fetch(`${baseUrl}/blog.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
+    fetch(`${baseUrl}/cafearticle.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
+    fetch(`${baseUrl}/news.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
+    fetch(`${baseUrl}/webkr.json?query=${encodeURIComponent(keyword)}&display=100`, { headers })
+  ])
 
-  // 특정 키워드의 상세 통계 정보 가져오기
-  async getKeywordStats(keyword: string): Promise<ProcessedKeywordData | null> {
-    try {
-      const results = await this.getKeywords([keyword], true);
-      return results.length > 0 ? results[0] : null;
-    } catch (error) {
-      console.error(`키워드 "${keyword}" 통계 조회 실패:`, error);
-      return null;
-    }
-  }
+  const [blogData, cafeData, newsData, webData] = await Promise.all([
+    blogRes.json(),
+    cafeRes.json(),
+    newsRes.json(),
+    webRes.json()
+  ])
 
-  // 고성능 병렬 처리: 여러 키워드의 상세 통계를 동시에 수집
-  async getBatchKeywordStats(
-    keywords: string[], 
-    maxConcurrency: number = 10,
-    onProgress?: (current: number, total: number) => void
-  ): Promise<ProcessedKeywordData[]> {
-    const results: ProcessedKeywordData[] = [];
-    const availableKeys = this.apiKeyManager.getAvailableApiKeys(maxConcurrency);
-    
-    if (availableKeys.length === 0) {
-      console.warn('사용 가능한 API 키가 없어 배치 처리를 중단합니다.');
-      return results;
-    }
-
-    console.log(`${keywords.length}개 키워드를 ${availableKeys.length}개 API 키로 병렬 처리합니다.`);
-
-    // 키워드를 청크로 나누기
-    const chunkSize = Math.ceil(keywords.length / availableKeys.length);
-    const chunks = [];
-    for (let i = 0; i < keywords.length; i += chunkSize) {
-      chunks.push(keywords.slice(i, i + chunkSize));
-    }
-
-    // 각 API 키로 청크를 병렬 처리
-    let processedCount = 0;
-    const chunkPromises = chunks.map(async (chunk, index) => {
-      const apiKey = availableKeys[index % availableKeys.length];
-      const chunkResults: ProcessedKeywordData[] = [];
-
-      for (const keyword of chunk) {
-        try {
-          const result = await this.getKeywordStatsWithKey(keyword, apiKey);
-          if (result) {
-            chunkResults.push(result);
-          }
-          
-          // 진행률 업데이트
-          processedCount++;
-          if (onProgress) {
-            onProgress(processedCount, keywords.length);
-          }
-          
-          // API 호출 간격 조절
-          await new Promise(resolve => setTimeout(resolve, 50));
-        } catch (error) {
-          console.error(`키워드 "${keyword}" 처리 실패:`, error);
-          processedCount++;
-          if (onProgress) {
-            onProgress(processedCount, keywords.length);
-          }
-        }
-      }
-
-      return chunkResults;
-    });
-
-    // 모든 청크 결과를 기다리고 합치기
-    const allChunkResults = await Promise.all(chunkPromises);
-    allChunkResults.forEach(chunkResult => {
-      results.push(...chunkResult);
-    });
-
-    console.log(`배치 처리 완료: ${results.length}개 키워드 수집됨`);
-    return results;
-  }
-
-  // 특정 API 키로 키워드 통계 조회 (재시도 로직 포함)
-  private async getKeywordStatsWithKey(keyword: string, apiKeyInfo: any, maxRetries: number = 3): Promise<ProcessedKeywordData | null> {
-    let lastError: Error | null = null;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const timestamp = Date.now().toString();
-        const method = 'GET';
-        const uri = '/keywordstool';
-        const signature = this.generateSignature(timestamp, method, uri, apiKeyInfo.secret);
-
-        const params = new URLSearchParams({
-          hintKeywords: keyword,
-          showDetail: '1',
-        });
-
-        const url = `${this.baseUrl}${uri}?${params.toString()}`;
-
-        const headers = {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Timestamp': timestamp,
-          'X-API-KEY': apiKeyInfo.apiKey,
-          'X-Customer': apiKeyInfo.customerId,
-          'X-Signature': signature,
-        };
-
-        const response = await fetch(url, {
-          method: 'GET',
-          headers,
-        });
-
-        // API 사용량 증가
-        this.apiKeyManager.incrementUsage(apiKeyInfo.id);
-
-        if (response.status === 429) {
-          this.apiKeyManager.deactivateApiKey(apiKeyInfo.id);
-          throw new Error('API 호출 한도 초과');
-        }
-
-        if (response.status === 500 || response.status === 502 || response.status === 503) {
-          // 서버 오류는 재시도
-          throw new Error(`서버 오류: ${response.status}`);
-        }
-
-        if (!response.ok) {
-          throw new Error(`API 요청 실패: ${response.status}`);
-        }
-
-        const data: NaverApiResponse = await response.json();
-        
-        if (!data || !data.keywordList || !Array.isArray(data.keywordList)) {
-          return null;
-        }
-
-        const validItems = data.keywordList.filter(item => item && typeof item === 'object');
-        if (validItems.length === 0) {
-          return null;
-        }
-
-        return this.processKeywordData(validItems[0]);
-        
-      } catch (error) {
-        lastError = error as Error;
-        
-        // 429 에러나 네트워크 오류가 아닌 경우 재시도하지 않음
-        if (error instanceof Error && 
-            (error.message.includes('한도 초과') || 
-             error.message.includes('API 요청 실패'))) {
-          break;
-        }
-        
-        // 재시도 전 대기 (지수 백오프, 429 에러 시 5분 대기)
-        if (attempt < maxRetries) {
-          let delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          if (error instanceof Error && error.message.includes('한도 초과')) {
-            delay = 300000; // 5분 대기
-            console.warn(`키워드 "${keyword}" 429 에러로 인한 5분 대기`);
-          } else {
-            console.warn(`키워드 "${keyword}" ${attempt}차 시도 실패, ${delay}ms 후 재시도:`, error);
-          }
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-    
-    console.error(`키워드 "${keyword}" 최종 실패 (${maxRetries}회 시도):`, lastError);
-    return null;
-  }
-
-
-  // API 키 상태 조회
-  getApiKeyStatus() {
-    return this.apiKeyManager.getApiKeyStatus();
-  }
-
-  // 사용 가능한 총 API 호출 수
-  getTotalRemainingCalls(): number {
-    return this.apiKeyManager.getTotalRemainingCalls();
+  return {
+    blog: blogData.total || 0,
+    cafe: cafeData.total || 0,
+    news: newsData.total || 0,
+    web: webData.total || 0
   }
 }
 
-export const naverAPI = new NaverKeywordAPI();
+// 데이터 정규화
+export function normalizeSearchAdData(
+  searchAdData: SearchAdResponse,
+  openApiData: { blog: number; cafe: number; news: number; web: number }
+) {
+  if (!searchAdData?.keywordList) return []
+
+  return searchAdData.keywordList.map((item) => {
+    const pcSearch = Math.max(item.monthlyPcQcCnt || 0, 10)
+    const mobileSearch = Math.max(item.monthlyMobileQcCnt || 0, 10)
+    const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web
+    
+    // 잠재지수 계산
+    const potentialScore = ((pcSearch + mobileSearch) / Math.max(totalDocs, 1)) * 100
+
+    return {
+      rel_keyword: item.relKeyword || '',
+      pc_search: pcSearch,
+      mobile_search: mobileSearch,
+      ctr_pc: parseFloat(item.plAvgCpc?.toString() || '0'),
+      ctr_mo: parseFloat(item.moAvgCpc?.toString() || '0'),
+      ad_count: parseInt(item.competition || '0'),
+      comp_idx: item.competition === 'HIGH' ? '높음' : 
+                item.competition === 'MEDIUM' ? '중간' : '낮음',
+      blog_count: openApiData.blog,
+      cafe_count: openApiData.cafe,
+      news_count: openApiData.news,
+      web_count: openApiData.web,
+      total_docs: totalDocs,
+      potential_score: potentialScore,
+      source: 'fresh' as const
+    }
+  })
+}

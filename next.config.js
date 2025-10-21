@@ -1,22 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  swcMinify: true,
   experimental: {
-    forceSwcTransforms: true
+    runtime: 'edge',
   },
-  // 빌드 최적화
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = [...(config.externals || []), 'sharp', 'canvas'];
-    }
-    return config;
-  },
-  images: {
-    remotePatterns: [{ 
-      protocol: 'https', 
-      hostname: '**' 
-    }]
+  env: {
+    SEARCHAD_ACCESS_LICENSE: process.env.SEARCHAD_ACCESS_LICENSE,
+    SEARCHAD_SECRET_KEY: process.env.SEARCHAD_SECRET_KEY,
+    SEARCHAD_CUSTOMER_ID: process.env.SEARCHAD_CUSTOMER_ID,
+    NAVER_CLIENT_ID: process.env.NAVER_CLIENT_ID,
+    NAVER_CLIENT_SECRET: process.env.NAVER_CLIENT_SECRET,
   }
 }
 

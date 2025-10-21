@@ -1,44 +1,15 @@
-name = "nkey-workers"
-main = "dist/worker.mjs"
-compatibility_date = "2025-01-21"
+name = "nkey-cf"
+compatibility_date = "2024-01-01"
 
-# Pages: Next on Pages 산출물 배포
-[build]
-command = "npm run build"
+[env.production]
+vars = { ENVIRONMENT = "production" }
 
-[site]
-bucket = ".vercel/output/static"
-
-# --- Bindings ---
 [[d1_databases]]
 binding = "DB"
-database_name = "NKEY_DB"
-database_id = "REPLACE_WITH_D1_DB_ID"
-
-[[r2_buckets]]
-binding = "R2"
-bucket_name = "nkey-r2"
+database_name = "nkey-db"
+database_id = "your-database-id"
 
 [[kv_namespaces]]
-binding = "KV_CACHE"
-id = "REPLACE_WITH_KV_CACHE_ID"
-
-[[kv_namespaces]]
-binding = "KV_RL"
-id = "REPLACE_WITH_KV_RL_ID"
-
-[[kv_namespaces]]
-binding = "KV_JOBS"
-id = "REPLACE_WITH_KV_JOBS_ID"
-
-[vars]
-SITE_URL = "https://nkey-cf.pages.dev"
-
-[env.production.vars]
-# 빈값은 CF 대시보드에서 Secret으로 주입
-# POSTS_API_KEY, REVALIDATE_SECRET, SLACK_WEBHOOK_URL
-# MAKE_WEBHOOK_URL (선택)
-
-# --- Cron (매 정시) ---
-[triggers]
-crons = ["0 * * * *"]
+binding = "CACHE"
+id = "your-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"

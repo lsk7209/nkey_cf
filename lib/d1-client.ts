@@ -1,226 +1,224 @@
-// D1 데이터베이스 클라이언트 (Cloudflare D1용)
-export class D1Client {
-  private db: any;
+// Cloudflare D1 데이터베이스 클라이언트
 
-  constructor(db: any) {
-    this.db = db;
+export interface KeywordRecord {
+  id?: number
+  date_bucket: string
+  keyword: string
+  rel_keyword: string
+  pc_search: number
+  mobile_search: number
+  click_pc: number
+  click_mo: number
+  ctr_pc: number
+  ctr_mo: number
+  ad_count: number
+  comp_idx: string
+  blog_count: number
+  cafe_count: number
+  news_count: number
+  web_count: number
+  total_docs: number
+  potential_score: number
+  raw_json?: string
+  fetched_at: string
+}
+
+// D1 데이터베이스 연결 (실제 구현에서는 Cloudflare 환경에서 사용)
+export function getD1Database() {
+  // Cloudflare Workers 환경에서 사용
+  // return env.DB as D1Database
+  throw new Error('D1 데이터베이스는 Cloudflare 환경에서만 사용 가능합니다.')
+}
+
+// 키워드 데이터 저장 (UPSERT)
+export async function saveKeywordData(
+  db: any, // D1Database 타입
+  data: Omit<KeywordRecord, 'id'>[]
+): Promise<void> {
+  const stmt = db.prepare(`
+    INSERT OR REPLACE INTO keywords (
+      date_bucket, keyword, rel_keyword, pc_search, mobile_search,
+      click_pc, click_mo, ctr_pc, ctr_mo, ad_count, comp_idx,
+      blog_count, cafe_count, news_count, web_count, total_docs,
+      potential_score, raw_json, fetched_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  for (const item of data) {
+    await stmt.bind(
+      item.date_bucket,
+      item.keyword,
+      item.rel_keyword,
+      item.pc_search,
+      item.mobile_search,
+      item.click_pc,
+      item.click_mo,
+      item.ctr_pc,
+      item.ctr_mo,
+      item.ad_count,
+      item.comp_idx,
+      item.blog_count,
+      item.cafe_count,
+      item.news_count,
+      item.web_count,
+      item.total_docs,
+      item.potential_score,
+      item.raw_json || null,
+      item.fetched_at
+    ).run()
+  }
+}
+
+// 키워드 데이터 조회
+export async function getKeywordData(
+  db: any, // D1Database 타입
+  params: {
+    page: number
+    pageSize: number
+    query?: string
+    dateFilter?: string
+    compFilter?: string
+    sortBy: string
+    sortOrder: string
+  }
+): Promise<{
+  total: number
+  items: KeywordRecord[]
+  page: number
+  totalPages: number
+}> {
+  // WHERE 조건 구성
+  const conditions: string[] = []
+  const bindings: any[] = []
+
+  if (params.query) {
+    conditions.push('(keyword LIKE ? OR rel_keyword LIKE ?)')
+    bindings.push(`%${params.query}%`, `%${params.query}%`)
   }
 
-  // 수동수집 결과 저장
-  async saveManualCollectionResults(data: any[]) {
-    if (!data || data.length === 0) return { success: false, savedCount: 0, error: 'No data to save' };
-
-    try {
-      const stmt = `INSERT OR IGNORE INTO manual_collection_results 
-        (seed_keyword, keyword, pc_search, mobile_search, total_search, 
-         monthly_click_pc, monthly_click_mobile, ctr_pc, ctr_mobile, 
-         ad_count, comp_idx, blog_count, news_count, webkr_count, cafe_count, 
-         is_used_as_seed, raw_json, fetched_at, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-      let savedCount = 0;
-      for (const item of data) {
-        const result = await this.db.prepare(stmt).bind(
-          item.seed_keyword,
-          item.keyword,
-          item.pc_search,
-          item.mobile_search,
-          item.total_search,
-          item.monthly_click_pc,
-          item.monthly_click_mobile,
-          item.ctr_pc,
-          item.ctr_mobile,
-          item.ad_count,
-          item.comp_idx,
-          item.blog_count || 0,
-          item.news_count || 0,
-          item.webkr_count || 0,
-          item.cafe_count || 0,
-          item.is_used_as_seed || false,
-          item.raw_json,
-          item.fetched_at,
-          item.created_at || new Date().toISOString()
-        ).run();
-
-        if (result.success && result.meta.changes > 0) {
-          savedCount++;
-        }
-      }
-
-      return { success: true, savedCount };
-    } catch (error: any) {
-      console.error('D1 저장 오류:', error);
-      return { success: false, savedCount: 0, error: error.message };
+  if (params.dateFilter && params.dateFilter !== 'all') {
+    const today = new Date()
+    let cutoffDate: string
+    
+    switch (params.dateFilter) {
+      case 'today':
+        cutoffDate = today.toISOString().split('T')[0]
+        break
+      case '7days':
+        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+        cutoffDate = weekAgo.toISOString().split('T')[0]
+        break
+      case '30days':
+        const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+        cutoffDate = monthAgo.toISOString().split('T')[0]
+        break
+      default:
+        cutoffDate = '1900-01-01'
     }
+    
+    conditions.push('fetched_at >= ?')
+    bindings.push(cutoffDate)
   }
 
-  // 중복 키워드 필터링
-  async filterDuplicateKeywords(keywords: string[]): Promise<string[]> {
-    if (keywords.length === 0) return [];
-
-    try {
-      const placeholders = keywords.map(() => '?').join(',');
-      const query = `SELECT keyword FROM manual_collection_results WHERE keyword IN (${placeholders})`;
-      const { results } = await this.db.prepare(query).bind(...keywords).all();
-      
-      const existingKeywords = new Set(results.map((r: any) => r.keyword));
-      return keywords.filter(keyword => !existingKeywords.has(keyword));
-    } catch (error) {
-      console.error('중복 키워드 필터링 오류:', error);
-      return keywords; // 오류 시 모든 키워드 반환
+  if (params.compFilter && params.compFilter !== 'all') {
+    const compMap: { [key: string]: string } = {
+      'high': '높음',
+      'medium': '중간',
+      'low': '낮음'
     }
+    
+    conditions.push('comp_idx = ?')
+    bindings.push(compMap[params.compFilter])
   }
 
-  // 자동수집3 상태 업데이트
-  async updateAutoCollect3Status(updates: any) {
-    try {
-      const updateFields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-      const values = Object.values(updates);
-      
-      const stmt = `UPDATE auto_collect3_status SET ${updateFields}, updated_at = ? WHERE id = 1`;
-      await this.db.prepare(stmt).bind(...values, new Date().toISOString()).run();
-    } catch (error) {
-      console.error('자동수집3 상태 업데이트 실패:', error);
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  // 총 개수 조회
+  const countResult = await db.prepare(`
+    SELECT COUNT(*) as total FROM keywords ${whereClause}
+  `).bind(...bindings).first()
+
+  const total = countResult?.total || 0
+  const totalPages = Math.ceil(total / params.pageSize)
+
+  // 데이터 조회
+  const offset = (params.page - 1) * params.pageSize
+  const orderBy = `ORDER BY ${params.sortBy} ${params.sortOrder.toUpperCase()}`
+  const limit = `LIMIT ${params.pageSize} OFFSET ${offset}`
+
+  const result = await db.prepare(`
+    SELECT * FROM keywords ${whereClause} ${orderBy} ${limit}
+  `).bind(...bindings).all()
+
+  return {
+    total,
+    items: result.results as KeywordRecord[],
+    page: params.page,
+    totalPages
+  }
+}
+
+// 모든 데이터 조회 (CSV용)
+export async function getAllKeywordData(
+  db: any, // D1Database 타입
+  params: {
+    query?: string
+    dateFilter?: string
+    compFilter?: string
+    sortBy: string
+    sortOrder: string
+  }
+): Promise<KeywordRecord[]> {
+  // WHERE 조건 구성 (getKeywordData와 동일)
+  const conditions: string[] = []
+  const bindings: any[] = []
+
+  if (params.query) {
+    conditions.push('(keyword LIKE ? OR rel_keyword LIKE ?)')
+    bindings.push(`%${params.query}%`, `%${params.query}%`)
+  }
+
+  if (params.dateFilter && params.dateFilter !== 'all') {
+    const today = new Date()
+    let cutoffDate: string
+    
+    switch (params.dateFilter) {
+      case 'today':
+        cutoffDate = today.toISOString().split('T')[0]
+        break
+      case '7days':
+        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+        cutoffDate = weekAgo.toISOString().split('T')[0]
+        break
+      case '30days':
+        const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+        cutoffDate = monthAgo.toISOString().split('T')[0]
+        break
+      default:
+        cutoffDate = '1900-01-01'
     }
+    
+    conditions.push('fetched_at >= ?')
+    bindings.push(cutoffDate)
   }
 
-  // 자동수집3 상태 조회
-  async getAutoCollect3Status() {
-    try {
-      const { results } = await this.db.prepare('SELECT * FROM auto_collect3_status WHERE id = 1').all();
-      return results[0] || null;
-    } catch (error) {
-      console.error('자동수집3 상태 조회 실패:', error);
-      return null;
+  if (params.compFilter && params.compFilter !== 'all') {
+    const compMap: { [key: string]: string } = {
+      'high': '높음',
+      'medium': '중간',
+      'low': '낮음'
     }
+    
+    conditions.push('comp_idx = ?')
+    bindings.push(compMap[params.compFilter])
   }
 
-  // 시드키워드 조회 (자동수집3용)
-  async getAvailableSeedKeywords(limit: number) {
-    try {
-      const { results } = await this.db.prepare(`
-        SELECT id, keyword, total_search 
-        FROM manual_collection_results 
-        WHERE is_used_as_seed = FALSE 
-        ORDER BY total_search DESC 
-        LIMIT ?
-      `).bind(limit).all();
-      
-      return results || [];
-    } catch (error) {
-      console.error('시드키워드 조회 실패:', error);
-      return [];
-    }
-  }
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const orderBy = `ORDER BY ${params.sortBy} ${params.sortOrder.toUpperCase()}`
 
-  // 키워드 데이터 조회 (데이터 페이지용)
-  async getKeywordsData(filters: any, pagination: any) {
-    try {
-      let query = 'SELECT * FROM manual_collection_results WHERE 1=1';
-      const params: any[] = [];
+  const result = await db.prepare(`
+    SELECT * FROM keywords ${whereClause} ${orderBy}
+  `).bind(...bindings).all()
 
-      // 필터 적용
-      if (filters.search) {
-        query += ' AND keyword LIKE ?';
-        params.push(`%${filters.search}%`);
-      }
-
-      if (filters.seedKeyword) {
-        query += ' AND seed_keyword = ?';
-        params.push(filters.seedKeyword);
-      }
-
-      if (filters.totalSearchMin) {
-        query += ' AND total_search >= ?';
-        params.push(parseInt(filters.totalSearchMin));
-      }
-
-      if (filters.totalSearchMax) {
-        query += ' AND total_search <= ?';
-        params.push(parseInt(filters.totalSearchMax));
-      }
-
-      // 정렬
-      const sortBy = filters.sortBy || 'cafe_count';
-      const sortOrder = filters.sortOrder || 'desc';
-      query += ` ORDER BY ${sortBy} ${sortOrder.toUpperCase()}`;
-
-      // 페이지네이션
-      const offset = (pagination.page - 1) * pagination.limit;
-      query += ' LIMIT ? OFFSET ?';
-      params.push(pagination.limit, offset);
-
-      const { results } = await this.db.prepare(query).bind(...params).all();
-      
-      // 총 개수 조회
-      let countQuery = 'SELECT COUNT(*) as total FROM manual_collection_results WHERE 1=1';
-      const countParams: any[] = [];
-      
-      if (filters.search) {
-        countQuery += ' AND keyword LIKE ?';
-        countParams.push(`%${filters.search}%`);
-      }
-
-      if (filters.seedKeyword) {
-        countQuery += ' AND seed_keyword = ?';
-        countParams.push(filters.seedKeyword);
-      }
-
-      if (filters.totalSearchMin) {
-        countQuery += ' AND total_search >= ?';
-        countParams.push(parseInt(filters.totalSearchMin));
-      }
-
-      if (filters.totalSearchMax) {
-        countQuery += ' AND total_search <= ?';
-        countParams.push(parseInt(filters.totalSearchMax));
-      }
-
-      const { results: countResults } = await this.db.prepare(countQuery).bind(...countParams).all();
-      const total = countResults[0]?.total || 0;
-
-      return {
-        data: results || [],
-        pagination: {
-          ...pagination,
-          total,
-          totalPages: Math.ceil(total / pagination.limit),
-          hasNext: pagination.page * pagination.limit < total,
-          hasPrev: pagination.page > 1
-        }
-      };
-    } catch (error) {
-      console.error('키워드 데이터 조회 실패:', error);
-      return { data: [], pagination: { ...pagination, total: 0, totalPages: 0, hasNext: false, hasPrev: false } };
-    }
-  }
-
-  // 시드키워드 목록 조회
-  async getSeedKeywords() {
-    try {
-      const { results } = await this.db.prepare(`
-        SELECT DISTINCT seed_keyword 
-        FROM manual_collection_results 
-        ORDER BY seed_keyword
-      `).all();
-      
-      return results.map((r: any) => r.seed_keyword);
-    } catch (error) {
-      console.error('시드키워드 목록 조회 실패:', error);
-      return [];
-    }
-  }
-
-  // 시드키워드 사용 완료 표시
-  async markSeedAsUsed(seedId: number) {
-    try {
-      await this.db.prepare(`
-        UPDATE manual_collection_results 
-        SET is_used_as_seed = true, updated_at = ?
-        WHERE id = ?
-      `).bind(new Date().toISOString(), seedId).run();
-    } catch (error) {
-      console.error('시드키워드 사용 완료 표시 실패:', error);
-    }
-  }
+  return result.results as KeywordRecord[]
 }

@@ -20,23 +20,63 @@ interface KeywordRecord {
   fetched_at: string
 }
 
-interface DataResponse {
-  total: number
-  items: KeywordRecord[]
-  page: number
-  totalPages: number
+// CSV 헤더
+const CSV_HEADERS = [
+  '수집일',
+  '키워드',
+  '관련키워드',
+  'PC검색량',
+  '모바일검색량',
+  'PC_CTR',
+  '모바일_CTR',
+  '광고수',
+  '경쟁도',
+  '블로그수',
+  '카페수',
+  '뉴스수',
+  '웹수',
+  '총문서수',
+  '잠재지수',
+  '수집시간'
+]
+
+// 레코드를 CSV 행으로 변환
+function recordToCSVRow(record: KeywordRecord): string {
+  return [
+    record.date_bucket,
+    record.keyword,
+    record.rel_keyword,
+    record.pc_search,
+    record.mobile_search,
+    record.ctr_pc,
+    record.ctr_mo,
+    record.ad_count,
+    record.comp_idx,
+    record.blog_count,
+    record.cafe_count,
+    record.news_count,
+    record.web_count,
+    record.total_docs,
+    record.potential_score,
+    record.fetched_at
+  ].map(field => {
+    // CSV 이스케이프 처리
+    const str = String(field || '')
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`
+    }
+    return str
+  }).join(',')
 }
 
 // D1 데이터베이스에서 데이터 조회 (실제 구현에서는 Cloudflare D1 사용)
-async function fetchDataFromDatabase(params: {
-  page: number
-  pageSize: number
+async function fetchAllDataFromDatabase(params: {
   query?: string
   dateFilter?: string
   compFilter?: string
   sortBy: string
   sortOrder: string
-}): Promise<DataResponse> {
+}): Promise<KeywordRecord[]> {
   // TODO: 실제 D1 데이터베이스 연결
   // const db = getD1Database()
   
@@ -82,7 +122,7 @@ async function fetchDataFromDatabase(params: {
     }
   ]
 
-  // 필터링 로직
+  // 필터링 로직 (data/route.ts와 동일)
   let filteredData = mockData
 
   if (params.query) {
@@ -139,35 +179,20 @@ async function fetchDataFromDatabase(params: {
     }
   })
 
-  const total = filteredData.length
-  const totalPages = Math.ceil(total / params.pageSize)
-  const startIndex = (params.page - 1) * params.pageSize
-  const endIndex = startIndex + params.pageSize
-  const items = filteredData.slice(startIndex, endIndex)
-
-  return {
-    total,
-    items,
-    page: params.page,
-    totalPages
-  }
+  return filteredData
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '50')
     const query = searchParams.get('query') || undefined
     const dateFilter = searchParams.get('dateFilter') || undefined
     const compFilter = searchParams.get('compFilter') || undefined
     const sortBy = searchParams.get('sortBy') || 'fetched_at'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    const result = await fetchDataFromDatabase({
-      page,
-      pageSize,
+    const data = await fetchAllDataFromDatabase({
       query,
       dateFilter,
       compFilter,
@@ -175,11 +200,29 @@ export async function GET(request: NextRequest) {
       sortOrder
     })
 
-    return NextResponse.json(result)
+    // CSV 생성
+    const csvRows = [
+      CSV_HEADERS.join(','),
+      ...data.map(recordToCSVRow)
+    ]
+    
+    const csvContent = csvRows.join('\n')
+    
+    // UTF-8 BOM 추가 (Excel 호환성)
+    const bom = '\uFEFF'
+    const csvWithBom = bom + csvContent
+
+    return new NextResponse(csvWithBom, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="keywords_${new Date().toISOString().split('T')[0]}.csv"`,
+      },
+    })
   } catch (error) {
-    console.error('Data API Error:', error)
+    console.error('CSV Export Error:', error)
     return NextResponse.json(
-      { message: '데이터 조회 중 오류가 발생했습니다.' },
+      { message: 'CSV 다운로드 중 오류가 발생했습니다.' },
       { status: 500 }
     )
   }
