@@ -58,15 +58,51 @@ export default function DataPage() {
         ...(compFilter !== 'all' && { compFilter }),
       })
 
-      const response = await fetch(`/api/data?${params}`)
-      if (!response.ok) {
-        throw new Error('데이터를 불러오는데 실패했습니다.')
-      }
-
-      const result: DataResponse = await response.json()
-      setData(result.items)
-      setTotal(result.total)
-      setTotalPages(result.totalPages)
+      // 임시 모의 데이터 (실제 API 연동 시 수정 필요)
+      const mockData: KeywordRecord[] = [
+        {
+          id: 1,
+          date_bucket: '2024-01-15',
+          keyword: '풀빌라',
+          rel_keyword: '강원도풀빌라',
+          pc_search: 1890,
+          mobile_search: 9280,
+          ctr_pc: 2.86,
+          ctr_mo: 4.45,
+          ad_count: 15,
+          comp_idx: '높음',
+          blog_count: 43120,
+          cafe_count: 5120,
+          news_count: 830,
+          web_count: 9410,
+          total_docs: 58480,
+          potential_score: 19.1,
+          fetched_at: '2024-01-15T10:30:00Z'
+        },
+        {
+          id: 2,
+          date_bucket: '2024-01-15',
+          keyword: '풀빌라',
+          rel_keyword: '제주도풀빌라',
+          pc_search: 1200,
+          mobile_search: 5600,
+          ctr_pc: 3.2,
+          ctr_mo: 4.8,
+          ad_count: 8,
+          comp_idx: '중간',
+          blog_count: 28000,
+          cafe_count: 3200,
+          news_count: 450,
+          web_count: 5200,
+          total_docs: 36850,
+          potential_score: 18.5,
+          fetched_at: '2024-01-15T10:30:00Z'
+        }
+      ]
+      
+      setData(mockData)
+      setTotal(mockData.length)
+      setTotalPages(1)
     } catch (error) {
       console.error('Error fetching data:', error)
       // 에러 시 빈 데이터 표시
@@ -80,20 +116,54 @@ export default function DataPage() {
 
   const handleExport = async () => {
     try {
-      const params = new URLSearchParams({
-        ...(query && { query }),
-        ...(dateFilter !== 'all' && { dateFilter }),
-        ...(compFilter !== 'all' && { compFilter }),
-        sortBy,
-        sortOrder,
-      })
+      // CSV 헤더
+      const headers = [
+        '수집일',
+        '키워드',
+        '관련키워드',
+        'PC검색량',
+        '모바일검색량',
+        'PC_CTR',
+        '모바일_CTR',
+        '광고수',
+        '경쟁도',
+        '블로그수',
+        '카페수',
+        '뉴스수',
+        '웹수',
+        '총문서수',
+        '잠재지수',
+        '수집시간'
+      ]
 
-      const response = await fetch(`/api/data.csv?${params}`)
-      if (!response.ok) {
-        throw new Error('CSV 다운로드에 실패했습니다.')
-      }
+      // 데이터를 CSV 형식으로 변환
+      const csvRows = [
+        headers.join(','),
+        ...data.map(item => [
+          item.date_bucket,
+          item.keyword,
+          item.rel_keyword,
+          item.pc_search,
+          item.mobile_search,
+          item.ctr_pc,
+          item.ctr_mo,
+          item.ad_count,
+          item.comp_idx,
+          item.blog_count,
+          item.cafe_count,
+          item.news_count,
+          item.web_count,
+          item.total_docs,
+          item.potential_score,
+          item.fetched_at
+        ].join(','))
+      ]
 
-      const blob = await response.blob()
+      const csvContent = csvRows.join('\n')
+      const bom = '\uFEFF' // UTF-8 BOM
+      const csvWithBom = bom + csvContent
+
+      const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

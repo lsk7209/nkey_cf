@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    runtime: 'edge',
+  output: 'export',
+  trailingSlash: true,
+  images: {
+    unoptimized: true
   },
   env: {
     SEARCHAD_ACCESS_LICENSE: process.env.SEARCHAD_ACCESS_LICENSE,

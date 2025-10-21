@@ -53,23 +53,48 @@ export default function Home() {
     setResults([])
 
     try {
-      const response = await fetch('/api/keyword', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          hintKeywords: keywordList.join(',')
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || '검색 중 오류가 발생했습니다.')
-      }
-
-      const data = await response.json()
-      setResults(data)
+      // 임시 모의 데이터 (실제 API 연동 시 수정 필요)
+      const mockData = [
+        {
+          keyword: keywordList[0],
+          related: [
+            {
+              rel_keyword: `${keywordList[0]} 관련키워드1`,
+              pc_search: 1890,
+              mobile_search: 9280,
+              ctr_pc: 2.86,
+              ctr_mo: 4.45,
+              ad_count: 15,
+              comp_idx: '높음',
+              blog_count: 43120,
+              cafe_count: 5120,
+              news_count: 830,
+              web_count: 9410,
+              total_docs: 58480,
+              potential_score: 19.1,
+              source: 'fresh'
+            },
+            {
+              rel_keyword: `${keywordList[0]} 관련키워드2`,
+              pc_search: 1200,
+              mobile_search: 5600,
+              ctr_pc: 3.2,
+              ctr_mo: 4.8,
+              ad_count: 8,
+              comp_idx: '중간',
+              blog_count: 28000,
+              cafe_count: 3200,
+              news_count: 450,
+              web_count: 5200,
+              total_docs: 36850,
+              potential_score: 18.5,
+              source: 'fresh'
+            }
+          ]
+        }
+      ]
+      
+      setResults(mockData)
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.')
     } finally {
