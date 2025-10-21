@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { D1Client } from '@/lib/d1-client'
 
-export async function GET() {
+export const runtime = 'edge'
+
+export async function GET(request: NextRequest, { params }: { params: any }) {
   try {
+    const d1Client = new D1Client(params.env.DB)
+    
     // 자동수집3 상태 조회
-    const { data: autoCollect3Status, error: statusError } = await supabase
-      .from('auto_collect3_status')
-      .select('*')
-      .eq('id', 1)
-      .single()
-
-    if (statusError) {
-      console.error('자동수집3 상태 조회 오류:', statusError)
-    }
+    const autoCollect3Status = await d1Client.getAutoCollect3Status()
 
     return NextResponse.json(autoCollect3Status || {
       is_running: false,

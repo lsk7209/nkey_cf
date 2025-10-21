@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: { 
+    runtime: 'edge' 
+  },
+  output: 'standalone',
+  images: {
+    remotePatterns: [{ 
+      protocol: 'https', 
+      hostname: '**' 
+    }]
+  },
   env: {
     SEARCHAD_BASE: process.env.SEARCHAD_BASE,
     SEARCHAD_API_KEY: process.env.SEARCHAD_API_KEY,

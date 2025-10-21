@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+// D1 클라이언트는 별도로 주입받음
 
 // 타입 정의
 export interface KeywordDetail {
@@ -41,26 +41,15 @@ export interface DatabaseInsertData {
   fetched_at: string
 }
 
-// 중복 키워드 필터링 함수 (공통)
-export async function filterDuplicateKeywords(keywordDetails: KeywordDetail[]): Promise<KeywordDetail[]> {
+// 중복 키워드 필터링 함수 (D1 클라이언트 사용)
+export async function filterDuplicateKeywords(keywordDetails: KeywordDetail[], d1Client: any): Promise<KeywordDetail[]> {
   if (keywordDetails.length === 0) return []
   
   const keywords = keywordDetails.map(detail => detail.keyword)
   
   try {
-    // 30일 이내에 존재하는 키워드들 조회
-    const { data: existingKeywords, error } = await supabase
-      .from('manual_collection_results')
-      .select('keyword')
-      .in('keyword', keywords)
-      .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30일 전
-    
-    if (error) {
-      console.error('중복 키워드 조회 오류:', error)
-      return keywordDetails // 오류 시 모든 키워드 반환
-    }
-    
-    const existingKeywordSet = new Set(existingKeywords?.map((item: any) => item.keyword) || [])
+    const existingKeywords = await d1Client.filterDuplicateKeywords(keywords)
+    const existingKeywordSet = new Set(keywords.filter(k => !existingKeywords.includes(k)))
     
     // 중복되지 않은 키워드만 필터링
     const filteredKeywords = keywordDetails.filter(detail => !existingKeywordSet.has(detail.keyword))
@@ -102,11 +91,12 @@ export function transformToInsertData(
   }))
 }
 
-// 배치 저장 함수
+// 배치 저장 함수 (D1 클라이언트 사용)
 export async function saveKeywordsBatch(
   insertData: DatabaseInsertData[],
   batchIndex: number,
-  totalBatches: number
+  totalBatches: number,
+  d1Client: any
 ): Promise<{ success: boolean; savedCount: number; error?: string }> {
   try {
     console.log(`🔍 저장할 데이터 상세:`, {
@@ -116,30 +106,22 @@ export async function saveKeywordsBatch(
       샘플데이터: insertData[0]
     })
     
-    console.log(`💾 Supabase 연결 확인 중...`)
-    if (!supabase) {
-      console.error(`❌ Supabase 클라이언트가 초기화되지 않음`)
-      return { success: false, savedCount: 0, error: 'Supabase 클라이언트 초기화 실패' }
+    console.log(`💾 D1 클라이언트 연결 확인 중...`)
+    if (!d1Client) {
+      console.error(`❌ D1 클라이언트가 초기화되지 않음`)
+      return { success: false, savedCount: 0, error: 'D1 클라이언트 초기화 실패' }
     }
     
-    console.log(`📡 데이터베이스 삽입 시작...`)
-    const { error: insertError } = await supabase
-      .from('manual_collection_results')
-      .insert(insertData)
+    console.log(`📡 D1 데이터베이스 삽입 시작...`)
+    const result = await d1Client.saveManualCollectionResults(insertData)
 
-    if (insertError) {
-      console.error(`❌ 배치 ${batchIndex + 1}/${totalBatches} 저장 실패:`, insertError)
-      console.error(`❌ 삽입 오류 상세:`, {
-        code: insertError.code,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint
-      })
-      return { success: false, savedCount: 0, error: insertError.message }
+    if (!result.success) {
+      console.error(`❌ 배치 ${batchIndex + 1}/${totalBatches} 저장 실패:`, result.error)
+      return { success: false, savedCount: 0, error: result.error }
     }
 
-    console.log(`✅ 배치 ${batchIndex + 1}/${totalBatches} 저장 완료: ${insertData.length}개 키워드`)
-    return { success: true, savedCount: insertData.length }
+    console.log(`✅ 배치 ${batchIndex + 1}/${totalBatches} 저장 완료: ${result.savedCount}개 키워드`)
+    return { success: true, savedCount: result.savedCount }
   } catch (error: any) {
     console.error(`❌ 배치 ${batchIndex + 1}/${totalBatches} 저장 중 오류:`, error)
     console.error(`❌ 오류 스택:`, error.stack)

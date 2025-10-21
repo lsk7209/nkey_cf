@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NaverKeywordAPI } from '@/lib/naver-api'
 import { NaverDocumentAPI } from '@/lib/naver-document-api'
+import { D1Client } from '@/lib/d1-client'
 import { 
   filterDuplicateKeywords, 
   transformToInsertData, 
@@ -12,8 +13,11 @@ import {
   logProgress,
   type KeywordDetail
 } from '@/lib/utils'
+import { rateLimit } from '@/lib/cache'
 
-export async function POST(request: NextRequest) {
+export const runtime = 'edge'
+
+export async function POST(request: NextRequest, { params }: { params: any }) {
   try {
     const body = await request.json()
     const { seedKeyword } = body
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest) {
         
         // 즉시 실행 (백그라운드 실행 방식 제거)
         try {
-          const result = await executeManualCollect(seedKeyword)
+          const result = await executeManualCollect(seedKeyword, params.env)
           return NextResponse.json({
             message: `수동수집이 완료되었습니다: "${seedKeyword}"`,
             seedKeyword,
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
 }
 
 // 백그라운드에서 실행되는 수동수집 함수
-async function executeManualCollect(seedKeyword: string) {
+async function executeManualCollect(seedKeyword: string, env: any) {
   console.log(`🔍 수동수집 디버깅 시작: "${seedKeyword}"`)
   
   try {
@@ -68,20 +72,20 @@ async function executeManualCollect(seedKeyword: string) {
     console.log(`📡 NaverDocumentAPI 인스턴스 생성 중...`)
     const documentAPI = new NaverDocumentAPI()
     
-    // Supabase 연결 상태 확인
-    console.log(`🔍 Supabase 연결 상태 확인 중...`)
-    const { supabase } = await import('@/lib/supabase')
-    if (!supabase) {
-      console.error(`❌ Supabase 클라이언트가 초기화되지 않음`)
+    // D1 연결 상태 확인
+    console.log(`🔍 D1 연결 상태 확인 중...`)
+    const d1Client = new D1Client(env.DB)
+    if (!d1Client) {
+      console.error(`❌ D1 클라이언트가 초기화되지 않음`)
       return {
         success: false,
         processedCount: 0,
         savedCount: 0,
         successRate: 0,
-        error: 'Supabase 연결 실패'
+        error: 'D1 연결 실패'
       }
     }
-    console.log(`✅ Supabase 클라이언트 연결 확인됨`)
+    console.log(`✅ D1 클라이언트 연결 확인됨`)
 
     // 연관키워드 수집 (실제 네이버 API 사용)
     console.log(`🔍 시드키워드 "${seedKeyword}" 연관키워드 수집 시작...`)
@@ -184,12 +188,12 @@ async function executeManualCollect(seedKeyword: string) {
           console.log(`💾 배치 ${batchIndex + 1} 데이터베이스 저장 시작...`)
           
           // 중복 키워드 필터링
-          const filteredKeywords = await filterDuplicateKeywords(batchKeywordDetails)
+          const filteredKeywords = await filterDuplicateKeywords(batchKeywordDetails, d1Client)
           console.log(`🔍 배치 ${batchIndex + 1} 중복 필터링 후:`, filteredKeywords.length, '개')
           
           if (filteredKeywords.length > 0) {
             const insertData = transformToInsertData(filteredKeywords, seedKeyword, false)
-            const result = await saveKeywordsBatch(insertData, batchIndex, totalBatches)
+            const result = await saveKeywordsBatch(insertData, batchIndex, totalBatches, d1Client)
             
             if (result.success) {
               totalSavedCount += result.savedCount

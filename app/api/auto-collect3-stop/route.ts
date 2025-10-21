@@ -1,25 +1,18 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { D1Client } from '@/lib/d1-client'
 
-export async function POST() {
+export const runtime = 'edge'
+
+export async function POST(request: NextRequest, { params }: { params: any }) {
   try {
-    const { error } = await supabase
-      .from('auto_collect3_status')
-      .update({
-        is_running: false,
-        end_time: new Date().toISOString(),
-        status_message: '사용자에 의해 자동수집3이 중단되었습니다.',
-        error_message: null
-      })
-      .eq('id', 1)
-
-    if (error) {
-      console.error('자동수집3 중단 실패:', error)
-      return NextResponse.json(
-        { message: '자동수집3 중단에 실패했습니다.', error: error.message },
-        { status: 500 }
-      )
-    }
+    const d1Client = new D1Client(params.env.DB)
+    
+    await d1Client.updateAutoCollect3Status({
+      is_running: false,
+      end_time: new Date().toISOString(),
+      status_message: '사용자에 의해 자동수집3이 중단되었습니다.',
+      error_message: null
+    })
 
     return NextResponse.json({ message: '자동수집3이 중단되었습니다.' })
 
