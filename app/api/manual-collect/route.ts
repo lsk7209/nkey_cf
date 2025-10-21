@@ -128,15 +128,15 @@ async function executeManualCollect(seedKeyword: string) {
     let totalProcessedCount = 0
     let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
 
-    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 200개 처리`)
+    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 1000개 처리`)
 
-    // 연관키워드 처리 (최대 200개, 20개씩 배치 처리)
-    const allKeywords = relatedKeywords.slice(0, 200)
-    const batchSize = 20 // 20개씩 배치 처리
+    // 연관키워드 처리 (최대 1000개, 10개씩 배치 처리)
+    const allKeywords = relatedKeywords.slice(0, 1000)
+    const batchSize = 10 // 10개씩 배치 처리 (타임아웃 방지)
     const totalBatches = Math.ceil(allKeywords.length / batchSize)
     
     console.log(`🔍 총 처리할 키워드:`, allKeywords.length, '개')
-    console.log(`📦 배치 처리:`, totalBatches, '개 배치 (각 20개씩)')
+    console.log(`📦 배치 처리:`, totalBatches, '개 배치 (각 10개씩)')
 
     // 배치별로 처리
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -150,7 +150,7 @@ async function executeManualCollect(seedKeyword: string) {
       try {
         // 1. 키워드 통계 수집
         console.log(`📊 키워드 통계 수집 시작...`)
-        const keywordStats = await naverAPI.getBatchKeywordStats(batchKeywords, 2) // 동시성 2로 감소
+        const keywordStats = await naverAPI.getBatchKeywordStats(batchKeywords, 1) // 동시성 1로 감소
         console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
         totalProcessedCount += keywordStats.length
         
@@ -162,7 +162,7 @@ async function executeManualCollect(seedKeyword: string) {
         // 2. 문서수 수집
         console.log(`📄 문서수 수집 시작...`)
         const keywordsForDocs = keywordStats.map(stat => stat.keyword)
-        const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 1) // 동시성 1로 감소
+        const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 1) // 동시성 1 유지
         console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
         
         // 3. 데이터 통합
@@ -206,8 +206,8 @@ async function executeManualCollect(seedKeyword: string) {
         
         // 배치 간 대기 (API 제한 방지)
         if (batchIndex < totalBatches - 1) {
-          console.log(`⏳ 다음 배치 처리 전 5초 대기...`)
-          await new Promise(resolve => setTimeout(resolve, 5000))
+          console.log(`⏳ 다음 배치 처리 전 3초 대기...`)
+          await new Promise(resolve => setTimeout(resolve, 3000))
         }
         
       } catch (batchError: any) {
