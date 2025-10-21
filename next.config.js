@@ -5,6 +5,13 @@ const nextConfig = {
   experimental: {
     forceSwcTransforms: true
   },
+  // 빌드 최적화
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'sharp', 'canvas'];
+    }
+    return config;
+  },
   images: {
     remotePatterns: [{ 
       protocol: 'https', 
