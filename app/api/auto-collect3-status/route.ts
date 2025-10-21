@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { D1Client } from '@/lib/d1-client'
 
 export const runtime = 'edge'
