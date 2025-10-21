@@ -124,19 +124,19 @@ async function executeManualCollect(seedKeyword: string) {
     console.log(`✅ 시드키워드 "${seedKeyword}" 연관키워드 ${relatedKeywords.length}개 수집됨`)
 
     // 🚀 고성능 병렬 처리: 다중 API 키 활용 + 메모리 최적화 + 실시간 배치 저장
-    const batchSize = 10 // 배치 크기 더 축소 (안정성 우선)
-    const processingConcurrency = 3 // 동시성 축소
-    const documentConcurrency = 2 // 동시성 축소
+    const batchSize = 20 // 배치 크기 증가 (1000개 처리용)
+    const processingConcurrency = 5 // 동시성 증가 (1000개 처리용)
+    const documentConcurrency = 3 // 동시성 증가 (1000개 처리용)
 
     let totalSavedCount = 0
     let totalProcessedCount = 0
     let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
     const totalBatches = Math.ceil(relatedKeywords.length / batchSize)
 
-    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 50개 처리`)
+    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 1000개 처리`)
 
-    // 연관키워드 모두 처리 (최대 50개로 제한하여 안정성 확보)
-    const testKeywords = relatedKeywords.slice(0, 50)
+    // 연관키워드 모두 처리 (최대 1000개로 제한하여 안정성 확보)
+    const testKeywords = relatedKeywords.slice(0, 1000)
     console.log(`🔍 처리할 키워드:`, testKeywords.length, '개')
     console.log(`📝 키워드 목록:`, testKeywords.slice(0, 10)) // 처음 10개만 로그
 
@@ -145,7 +145,7 @@ async function executeManualCollect(seedKeyword: string) {
       console.log(`📊 키워드 통계 수집 시작...`)
       console.log(`📝 수집할 키워드:`, testKeywords.length, '개')
       
-      const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 3) // 동시성 3으로 증가
+      const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 5) // 동시성 5로 증가
       console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
       console.log(`📊 수집된 통계 데이터 샘플:`, keywordStats.slice(0, 3)) // 처음 3개만 로그
       totalProcessedCount += keywordStats.length
@@ -166,7 +166,7 @@ async function executeManualCollect(seedKeyword: string) {
       const keywordsForDocs = keywordStats.map(stat => stat.keyword)
       console.log(`📝 문서수 수집할 키워드:`, keywordsForDocs.length, '개')
       
-      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 2) // 동시성 2로 증가
+      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 3) // 동시성 3으로 증가
       console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
       console.log(`📄 문서수 데이터 샘플:`, Object.fromEntries(Array.from(documentCountsMap.entries()).slice(0, 3))) // 처음 3개만 로그
       
