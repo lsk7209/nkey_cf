@@ -22,7 +22,7 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      run: npm install --legacy-peer-deps
 
     - name: Build Next.js app
       run: npm run build
@@ -52,7 +52,7 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      run: npm install --legacy-peer-deps
 
     - name: Deploy Workers
       uses: cloudflare/wrangler-action@v3
@@ -76,7 +76,7 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      run: npm install --legacy-peer-deps
 
     - name: Run D1 migrations
       uses: cloudflare/wrangler-action@v3
@@ -100,7 +100,7 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      run: npm install --legacy-peer-deps
 
     - name: Build Next.js app
       run: npm run build
