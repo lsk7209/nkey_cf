@@ -133,138 +133,109 @@ async function executeManualCollect(seedKeyword: string) {
     let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
     const totalBatches = Math.ceil(relatedKeywords.length / batchSize)
 
-    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 100개 처리`)
+    console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 1000개 처리`)
 
-    // 연관키워드 처리 (Vercel 타임아웃 방지를 위해 100개로 제한)
-    const testKeywords = relatedKeywords.slice(0, 100)
-    console.log(`🔍 처리할 키워드:`, testKeywords.length, '개')
-    console.log(`📝 키워드 목록:`, testKeywords.slice(0, 10)) // 처음 10개만 로그
+    // 연관키워드 처리 (최대 1000개, 50개씩 배치 처리)
+    const allKeywords = relatedKeywords.slice(0, 1000)
+    const batchSize = 50 // 50개씩 배치 처리
+    const totalBatches = Math.ceil(allKeywords.length / batchSize)
+    
+    console.log(`🔍 총 처리할 키워드:`, allKeywords.length, '개')
+    console.log(`📦 배치 처리:`, totalBatches, '개 배치 (각 50개씩)')
 
-    try {
-      // 1. 키워드 통계 수집 (배치 처리)
-      console.log(`📊 키워드 통계 수집 시작...`)
-      console.log(`📝 수집할 키워드:`, testKeywords.length, '개')
+    // 배치별로 처리
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startIndex = batchIndex * batchSize
+      const endIndex = Math.min(startIndex + batchSize, allKeywords.length)
+      const batchKeywords = allKeywords.slice(startIndex, endIndex)
       
-      const keywordStats = await naverAPI.getBatchKeywordStats(testKeywords, 3) // 동시성 3 (타임아웃 방지)
-      console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
-      console.log(`📊 수집된 통계 데이터 샘플:`, keywordStats.slice(0, 3)) // 처음 3개만 로그
-      totalProcessedCount += keywordStats.length
-      
-      if (keywordStats.length === 0) {
-        console.log(`⚠️ 키워드 통계 수집 실패 - API 응답 없음`)
-        return {
-          success: false,
-          processedCount: 0,
-          savedCount: 0,
-          successRate: 0,
-          error: '키워드 통계 수집 실패'
-        }
-      }
+      console.log(`\n🔄 배치 ${batchIndex + 1}/${totalBatches} 처리 시작 (${batchKeywords.length}개 키워드)`)
+      console.log(`📝 배치 키워드:`, batchKeywords.slice(0, 5)) // 처음 5개만 로그
 
-      // 2. 문서수 수집 (배치 처리)
-      console.log(`📄 문서수 수집 시작...`)
-      const keywordsForDocs = keywordStats.map(stat => stat.keyword)
-      console.log(`📝 문서수 수집할 키워드:`, keywordsForDocs.length, '개')
-      
-      const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 2) // 동시성 2 (타임아웃 방지)
-      console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
-      console.log(`📄 문서수 데이터 샘플:`, Object.fromEntries(Array.from(documentCountsMap.entries()).slice(0, 3))) // 처음 3개만 로그
-      
-      // 3. 데이터 통합
-      batchKeywordDetails = keywordStats.map(stat => {
-        const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 }
-        return {
-          ...stat,
-          blog_count: docCounts.blog,
-          news_count: docCounts.news,
-          webkr_count: docCounts.webkr,
-          cafe_count: docCounts.cafe
-        }
-      })
-      
-      console.log(`🔗 데이터 통합 완료:`, batchKeywordDetails.length, '개')
-      
-      // 4. 데이터베이스에 저장 (중복 키워드 처리 포함)
-      if (batchKeywordDetails.length > 0) {
-        console.log(`💾 데이터베이스 저장 시작...`)
-        console.log(`📊 저장할 키워드 상세:`, batchKeywordDetails)
+      try {
+        // 1. 키워드 통계 수집
+        console.log(`📊 키워드 통계 수집 시작...`)
+        const keywordStats = await naverAPI.getBatchKeywordStats(batchKeywords, 3)
+        console.log(`📊 키워드 통계 수집 결과:`, keywordStats.length, '개')
+        totalProcessedCount += keywordStats.length
         
-        // 중복 키워드 필터링
-        const filteredKeywords = await filterDuplicateKeywords(batchKeywordDetails)
-        console.log(`🔍 중복 필터링 후:`, filteredKeywords.length, '개')
-        console.log(`🔍 필터링된 키워드:`, filteredKeywords)
+        if (keywordStats.length === 0) {
+          console.log(`⚠️ 배치 ${batchIndex + 1} 키워드 통계 수집 실패`)
+          continue
+        }
+
+        // 2. 문서수 수집
+        console.log(`📄 문서수 수집 시작...`)
+        const keywordsForDocs = keywordStats.map(stat => stat.keyword)
+        const documentCountsMap = await documentAPI.getBatchDocumentCounts(keywordsForDocs, 2)
+        console.log(`📄 문서수 수집 결과:`, documentCountsMap.size, '개')
         
-        if (filteredKeywords.length > 0) {
-          const insertData = transformToInsertData(filteredKeywords, seedKeyword, false)
-          console.log(`📝 저장할 데이터:`, insertData.length, '개')
-          console.log(`📝 저장할 데이터 상세:`, insertData)
+        // 3. 데이터 통합
+        const batchKeywordDetails = keywordStats.map(stat => {
+          const docCounts = documentCountsMap.get(stat.keyword) || { blog: 0, news: 0, webkr: 0, cafe: 0 }
+          return {
+            ...stat,
+            blog_count: docCounts.blog,
+            news_count: docCounts.news,
+            webkr_count: docCounts.webkr,
+            cafe_count: docCounts.cafe
+          }
+        })
+        
+        console.log(`🔗 배치 ${batchIndex + 1} 데이터 통합 완료:`, batchKeywordDetails.length, '개')
+        
+        // 4. 데이터베이스에 저장 (중복 키워드 처리 포함)
+        if (batchKeywordDetails.length > 0) {
+          console.log(`💾 배치 ${batchIndex + 1} 데이터베이스 저장 시작...`)
           
-          const result = await saveKeywordsBatch(insertData, 0, 1)
+          // 중복 키워드 필터링
+          const filteredKeywords = await filterDuplicateKeywords(batchKeywordDetails)
+          console.log(`🔍 배치 ${batchIndex + 1} 중복 필터링 후:`, filteredKeywords.length, '개')
           
-          if (result.success) {
-            totalSavedCount += result.savedCount
-            console.log(`✅ 저장 성공:`, result.savedCount, '개')
+          if (filteredKeywords.length > 0) {
+            const insertData = transformToInsertData(filteredKeywords, seedKeyword, false)
+            const result = await saveKeywordsBatch(insertData, batchIndex, totalBatches)
+            
+            if (result.success) {
+              totalSavedCount += result.savedCount
+              console.log(`✅ 배치 ${batchIndex + 1} 저장 성공:`, result.savedCount, '개`)
+            } else {
+              console.error(`❌ 배치 ${batchIndex + 1} 저장 실패:`, result.error)
+            }
           } else {
-            console.error(`❌ 저장 실패:`, result.error)
+            console.log(`⏭️ 배치 ${batchIndex + 1} 모든 키워드가 중복이므로 패스`)
           }
         } else {
-          console.log(`⏭️ 모든 키워드가 중복이므로 패스`)
+          console.log(`⚠️ 배치 ${batchIndex + 1} 저장할 키워드 데이터가 없음`)
         }
-      } else {
-        console.log(`⚠️ 저장할 키워드 데이터가 없음`)
-      }
-      
-    } catch (testError: any) {
-      console.error(`❌ 테스트 처리 실패:`, testError)
-      console.error(`❌ 테스트 오류 스택:`, testError?.stack)
-      console.error(`❌ 테스트 오류 상세:`, {
-        name: testError?.name,
-        message: testError?.message,
-        cause: testError?.cause
-      })
-      
-      return {
-        success: false,
-        processedCount: totalProcessedCount,
-        savedCount: totalSavedCount,
-        successRate: 0,
-        error: testError?.message || '처리 중 오류 발생'
+        
+        // 배치 간 대기 (API 제한 방지)
+        if (batchIndex < totalBatches - 1) {
+          console.log(`⏳ 다음 배치 처리 전 2초 대기...`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+        
+      } catch (batchError: any) {
+        console.error(`❌ 배치 ${batchIndex + 1} 처리 실패:`, batchError)
+        console.error(`❌ 배치 오류 상세:`, {
+          name: batchError?.name,
+          message: batchError?.message,
+          cause: batchError?.cause
+        })
+        // 개별 배치 실패는 전체를 중단하지 않음
+        continue
       }
     }
 
     const successRate = totalProcessedCount > 0 ? ((totalSavedCount / totalProcessedCount) * 100).toFixed(1) : '0'
     console.log(`🎉 수동수집 완료! 시드키워드: "${seedKeyword}", 총 처리: ${totalProcessedCount}개, 저장: ${totalSavedCount}개, 성공률: ${successRate}%`)
 
-    // 프론트엔드에서 사용할 수 있도록 KeywordData 형태로 변환
-    const frontendKeywords = batchKeywordDetails.map((detail, index) => ({
-      id: `temp_${Date.now()}_${index}`, // 임시 ID
-      seed_keyword: seedKeyword,
-      keyword: detail.keyword,
-      pc_search: detail.pc_search,
-      mobile_search: detail.mobile_search,
-      total_search: detail.total_search,
-      monthly_click_pc: detail.monthly_click_pc,
-      monthly_click_mobile: detail.monthly_click_mobile,
-      ctr_pc: detail.ctr_pc,
-      ctr_mobile: detail.ctr_mobile,
-      ad_count: detail.ad_count,
-      comp_idx: detail.comp_idx,
-      blog_count: detail.blog_count || 0,
-      news_count: detail.news_count || 0,
-      webkr_count: detail.webkr_count || 0,
-      cafe_count: detail.cafe_count || 0,
-      is_used_as_seed: false,
-      raw_json: detail.raw_json,
-      fetched_at: detail.fetched_at,
-      created_at: new Date().toISOString()
-    }))
-
     return {
       success: true,
       processedCount: totalProcessedCount,
       savedCount: totalSavedCount,
       successRate: parseFloat(successRate),
-      keywords: frontendKeywords // 프론트엔드에서 필요한 키워드 데이터 추가
+      message: `수집 완료: ${totalProcessedCount}개 처리, ${totalSavedCount}개 저장 (배치 처리)`
     }
 
   } catch (error: any) {
