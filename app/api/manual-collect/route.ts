@@ -124,14 +124,9 @@ async function executeManualCollect(seedKeyword: string) {
     console.log(`✅ 시드키워드 "${seedKeyword}" 연관키워드 ${relatedKeywords.length}개 수집됨`)
 
     // 🚀 고성능 병렬 처리: 다중 API 키 활용 + 메모리 최적화 + 실시간 배치 저장
-    const batchSize = 10 // 배치 크기 (타임아웃 방지)
-    const processingConcurrency = 3 // 동시성 (타임아웃 방지)
-    const documentConcurrency = 2 // 동시성 (타임아웃 방지)
-
     let totalSavedCount = 0
     let totalProcessedCount = 0
     let batchKeywordDetails: KeywordDetail[] = [] // 스코프 문제 해결을 위해 외부로 이동
-    const totalBatches = Math.ceil(relatedKeywords.length / batchSize)
 
     console.log(`🚀 연관키워드 배치 처리 시작: ${relatedKeywords.length}개 키워드 중 최대 200개 처리`)
 
