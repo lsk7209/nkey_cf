@@ -14,9 +14,17 @@ export async function onRequestPost(context) {
         totalCount: related?.length || 0,
         dateBucket: new Date().toISOString().split('T')[0],
         fetchedAt: new Date().toISOString(),
-        simulation: true
+        simulation: true,
+        debug: {
+          kvAvailable: false,
+          envKeys: Object.keys(context.env || {}),
+          timestamp: new Date().toISOString()
+        }
       }), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
       })
     }
     
