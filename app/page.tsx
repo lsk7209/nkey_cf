@@ -17,7 +17,7 @@ interface KeywordData {
   web_count: number
   total_docs: number
   potential_score: number
-  source: 'fresh' | 'cache' | 'cooldown'
+  source: 'fresh' | 'cache' | 'cooldown' | 'error'
 }
 
 interface SearchResult {
@@ -92,10 +92,15 @@ export default function Home() {
           console.log('SearchAd 데이터:', searchAdData)
           console.log('OpenAPI 데이터:', openApiData)
 
-          // 데이터 정규화
+          // 데이터 정규화 (네이버 API 응답 필드에 맞게 수정)
           const normalizedData = searchAdData.keywordList?.map((item: any) => {
-            const pcSearch = Math.max(item.monthlyPcQcCnt || 0, 10)
-            const mobileSearch = Math.max(item.monthlyMobileQcCnt || 0, 10)
+            // 검색량 정규화 (< 10 처리)
+            const pcSearchStr = item.monthlyPcQcCnt || '0'
+            const mobileSearchStr = item.monthlyMobileQcCnt || '0'
+            const pcSearch = Math.max(parseInt(pcSearchStr.replace(/[<>\s]/g, '')) || 10, 10)
+            const mobileSearch = Math.max(parseInt(mobileSearchStr.replace(/[<>\s]/g, '')) || 10, 10)
+            
+            // 문서수 계산
             const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web
             const potentialScore = ((pcSearch + mobileSearch) / Math.max(totalDocs, 1)) * 100
 
@@ -103,11 +108,10 @@ export default function Home() {
               rel_keyword: item.relKeyword || '',
               pc_search: pcSearch,
               mobile_search: mobileSearch,
-              ctr_pc: parseFloat(item.plAvgCpc?.toString() || '0'),
-              ctr_mo: parseFloat(item.moAvgCpc?.toString() || '0'),
-              ad_count: parseInt(item.competition || '0'),
-              comp_idx: item.competition === 'HIGH' ? '높음' : 
-                        item.competition === 'MEDIUM' ? '중간' : '낮음',
+              ctr_pc: parseFloat(item.monthlyAvePcCtr?.toString() || '0'),
+              ctr_mo: parseFloat(item.monthlyAveMobileCtr?.toString() || '0'),
+              ad_count: parseInt(item.plAvgDepth || '0'),
+              comp_idx: item.compIdx || '중간',
               blog_count: openApiData.blog,
               cafe_count: openApiData.cafe,
               news_count: openApiData.news,
@@ -127,7 +131,22 @@ export default function Home() {
           // 에러가 발생해도 다른 키워드는 계속 처리
           results.push({
             keyword,
-            related: []
+            related: [{
+              rel_keyword: `${keyword} (오류 발생)`,
+              pc_search: 0,
+              mobile_search: 0,
+              ctr_pc: 0,
+              ctr_mo: 0,
+              ad_count: 0,
+              comp_idx: '오류',
+              blog_count: 0,
+              cafe_count: 0,
+              news_count: 0,
+              web_count: 0,
+              total_docs: 0,
+              potential_score: 0,
+              source: 'error' as const
+            }]
           })
         }
       }

@@ -35,11 +35,19 @@ export async function onRequestPost(context) {
     }
 
     const timestamp = Date.now().toString()
-    const method = 'POST'
+    const method = 'GET'
     const uri = '/keywordstool'
     
+    // 쿼리 파라미터 생성
+    const hintKeywords = keywords.join(',')
+    const queryParams = new URLSearchParams({
+      hintKeywords: hintKeywords,
+      showDetail: '1'
+    })
+    const fullUri = `${uri}?${queryParams.toString()}`
+    
     // HMAC-SHA256 시그니처 생성
-    const message = `${timestamp}.${method}.${uri}`
+    const message = `${timestamp}.${method}.${fullUri}`
     const encoder = new TextEncoder()
     const key = await crypto.subtle.importKey(
       'raw',
@@ -52,19 +60,18 @@ export async function onRequestPost(context) {
     const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
     
     console.log('Naver SearchAd API 호출 중...')
-    const response = await fetch('https://api.naver.com/keywordstool', {
-      method: 'POST',
+    console.log('요청 URL:', `https://api.naver.com${fullUri}`)
+    console.log('시그니처 메시지:', message)
+    
+    const response = await fetch(`https://api.naver.com${fullUri}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8',
         'X-Timestamp': timestamp,
         'X-API-KEY': apiKey.accessLicense,
         'X-Customer': apiKey.customerId,
         'X-Signature': signatureBase64,
-      },
-      body: JSON.stringify({
-        hintKeywords: keywords,
-        showDetail: 1
-      })
+      }
     })
 
     console.log('API 응답 상태:', response.status)
