@@ -2,6 +2,24 @@
 export async function onRequestPost(context) {
   try {
     console.log('데이터 저장 요청 시작')
+    
+    // KV 스토리지가 없으면 시뮬레이션 모드
+    if (!context.env.KEYWORDS_KV) {
+      console.log('KEYWORDS_KV가 설정되지 않음 - 시뮬레이션 모드')
+      const { keyword, related } = await context.request.json()
+      return new Response(JSON.stringify({
+        success: true,
+        keyword,
+        savedCount: related?.length || 0,
+        totalCount: related?.length || 0,
+        dateBucket: new Date().toISOString().split('T')[0],
+        fetchedAt: new Date().toISOString(),
+        simulation: true
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+    
     const { keyword, related, autoUpdateDocuments } = await context.request.json()
     console.log('저장할 키워드:', keyword)
     console.log('관련 키워드 개수:', related?.length || 0)

@@ -2,6 +2,27 @@
 export async function onRequestGet(context) {
   try {
     console.log('데이터 불러오기 요청 시작')
+    
+    // 기본 응답 구조
+    const defaultResponse = {
+      total: 0,
+      items: [],
+      page: 1,
+      pageSize: 50,
+      totalPages: 0
+    }
+    
+    // KV 스토리지가 없으면 빈 응답 반환
+    if (!context.env.KEYWORDS_KV) {
+      console.log('KEYWORDS_KV가 설정되지 않음')
+      return new Response(JSON.stringify(defaultResponse), {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      })
+    }
+    
     const url = new URL(context.request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const pageSize = parseInt(url.searchParams.get('pageSize') || '50')

@@ -1,0 +1,56 @@
+// Cloudflare Functions - KV 스토리지 테스트
+export async function onRequestGet(context) {
+  try {
+    console.log('KV 스토리지 테스트 시작')
+    
+    // 테스트 데이터 저장
+    const testKey = 'test:kv:storage'
+    const testData = {
+      message: 'KV 스토리지 테스트',
+      timestamp: new Date().toISOString(),
+      success: true
+    }
+    
+    console.log('테스트 데이터 저장 중...')
+    await context.env.KEYWORDS_KV.put(testKey, JSON.stringify(testData))
+    console.log('테스트 데이터 저장 완료')
+    
+    // 테스트 데이터 읽기
+    console.log('테스트 데이터 읽기 중...')
+    const retrievedData = await context.env.KEYWORDS_KV.get(testKey)
+    console.log('읽어온 데이터:', retrievedData)
+    
+    // 키 목록 조회
+    console.log('키 목록 조회 중...')
+    const { keys } = await context.env.KEYWORDS_KV.list({ prefix: 'test:' })
+    console.log('조회된 키 개수:', keys.length)
+    
+    const result = {
+      success: true,
+      message: 'KV 스토리지 테스트 성공',
+      testData: JSON.parse(retrievedData),
+      keyCount: keys.length,
+      timestamp: new Date().toISOString()
+    }
+    
+    return new Response(JSON.stringify(result), {
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    })
+  } catch (error) {
+    console.error('KV 스토리지 테스트 오류:', error)
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message || 'KV 스토리지 테스트 중 오류가 발생했습니다.',
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    })
+  }
+}
