@@ -6,6 +6,8 @@ export async function onRequestGet(context) {
     // 환경 변수 확인
     const envInfo = {
       KEYWORDS_KV: !!context.env.KEYWORDS_KV,
+      KEYWORDS_KV_type: typeof context.env.KEYWORDS_KV,
+      KEYWORDS_KV_methods: context.env.KEYWORDS_KV ? Object.getOwnPropertyNames(Object.getPrototypeOf(context.env.KEYWORDS_KV)) : [],
       envKeys: Object.keys(context.env || {}),
       timestamp: new Date().toISOString()
     }

@@ -41,12 +41,19 @@ export async function onRequestGet(context) {
     // KV에서 키 목록 조회 (매우 간단하게)
     try {
       console.log('키 목록 조회 시작...')
+      console.log('KV 바인딩 상태:', {
+        exists: !!context.env.KEYWORDS_KV,
+        type: typeof context.env.KEYWORDS_KV,
+        methods: context.env.KEYWORDS_KV ? Object.getOwnPropertyNames(Object.getPrototypeOf(context.env.KEYWORDS_KV)) : []
+      })
+      
       const result = await context.env.KEYWORDS_KV.list({ 
         prefix: 'data:',
         limit: 10 // 최대 10개만 조회
       })
       const keys = result.keys || []
       console.log('총 키 개수:', keys.length)
+      console.log('조회된 키들:', keys.map(k => k.name))
       
       // 최대 3개만 처리
       const maxKeys = Math.min(keys.length, 3)

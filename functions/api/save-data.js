@@ -33,6 +33,11 @@ export async function onRequestPost(context) {
     console.log('저장할 키워드:', keyword)
     console.log('관련 키워드 개수:', related?.length || 0)
     console.log('문서수 자동 업데이트:', autoUpdateDocuments)
+    console.log('KV 바인딩 상태:', {
+      exists: !!context.env.KEYWORDS_KV,
+      type: typeof context.env.KEYWORDS_KV,
+      methods: context.env.KEYWORDS_KV ? Object.getOwnPropertyNames(Object.getPrototypeOf(context.env.KEYWORDS_KV)) : []
+    })
     
     if (!keyword || !related || !Array.isArray(related)) {
       return new Response(JSON.stringify({ error: '키워드와 관련 데이터가 필요합니다.' }), {
@@ -121,14 +126,24 @@ export async function onRequestPost(context) {
         const storageKey = `data:${dateBucket}:${keyword}:${item.rel_keyword}`
         
         try {
+          console.log(`저장 시도: ${storageKey}`)
+          console.log(`저장할 데이터:`, JSON.stringify(record, null, 2))
+          
           // Cloudflare KV 문서에 따른 저장 방법
-          await context.env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
+          const putResult = await context.env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
             expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
           })
+          
+          console.log(`저장 결과:`, putResult)
           savedCount++
           console.log(`저장 완료: ${storageKey}`)
         } catch (saveError) {
           console.error(`KV 저장 오류 (${storageKey}):`, saveError)
+          console.error(`오류 상세:`, {
+            message: saveError.message,
+            stack: saveError.stack,
+            name: saveError.name
+          })
           // 저장 실패해도 계속 진행
         }
       } catch (error) {
