@@ -46,6 +46,10 @@ export default function DataPage() {
   const [compFilter, setCompFilter] = useState('all')
   const [sortBy, setSortBy] = useState('fetched_at')
   const [sortOrder, setSortOrder] = useState('desc')
+  
+  // 문서수 자동 수집 상태
+  const [isUpdatingDocs, setIsUpdatingDocs] = useState(false)
+  const [updateProgress, setUpdateProgress] = useState('')
 
   const fetchData = async () => {
     setLoading(true)
@@ -87,6 +91,58 @@ export default function DataPage() {
       setTotalPages(0)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleUpdateDocuments = async () => {
+    if (data.length === 0) {
+      alert('업데이트할 데이터가 없습니다.')
+      return
+    }
+
+    setIsUpdatingDocs(true)
+    setUpdateProgress('문서수 수집을 시작합니다...')
+
+    try {
+      // 현재 페이지의 키워드들에 대해 문서수 업데이트
+      const keywords = [...new Set(data.map(item => item.keyword))]
+      
+      for (let i = 0; i < keywords.length; i++) {
+        const keyword = keywords[i]
+        setUpdateProgress(`문서수 수집 중... (${i + 1}/${keywords.length}) - ${keyword}`)
+        
+        const response = await fetch('/api/update-documents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            keyword: keyword,
+            limit: 50 // 한 번에 최대 50개씩 처리
+          })
+        })
+
+        if (!response.ok) {
+          console.error(`문서수 업데이트 실패: ${response.status}`)
+          continue
+        }
+
+        const result = await response.json()
+        console.log(`문서수 업데이트 결과 (${keyword}):`, result)
+      }
+
+      setUpdateProgress('문서수 수집이 완료되었습니다. 데이터를 새로고침합니다...')
+      
+      // 데이터 새로고침
+      await fetchData()
+      
+      alert('문서수 수집이 완료되었습니다!')
+    } catch (error) {
+      console.error('문서수 업데이트 오류:', error)
+      alert('문서수 수집 중 오류가 발생했습니다.')
+    } finally {
+      setIsUpdatingDocs(false)
+      setUpdateProgress('')
     }
   }
 
@@ -261,6 +317,15 @@ export default function DataPage() {
             </div>
             
             <button
+              onClick={handleUpdateDocuments}
+              disabled={isUpdatingDocs || data.length === 0}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+            >
+              <Database className="h-4 w-4" />
+              {isUpdatingDocs ? '문서수 수집 중...' : '문서수 자동 수집'}
+            </button>
+            
+            <button
               onClick={handleExport}
               className="btn-primary flex items-center gap-2"
             >
@@ -269,6 +334,19 @@ export default function DataPage() {
             </button>
           </div>
         </div>
+
+        {/* 문서수 수집 진행 상황 */}
+        {isUpdatingDocs && (
+          <div className="card mb-6 bg-blue-50 border-blue-200">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <div>
+                <p className="text-blue-800 font-medium">문서수 자동 수집 중...</p>
+                <p className="text-blue-600 text-sm">{updateProgress}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
