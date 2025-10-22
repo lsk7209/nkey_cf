@@ -18,7 +18,8 @@ export async function onRequestPost(context) {
         debug: {
           kvAvailable: false,
           envKeys: Object.keys(context.env || {}),
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          message: 'KV 바인딩이 없어 시뮬레이션 모드로 작동'
         }
       }), {
         headers: { 

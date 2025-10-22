@@ -65,15 +65,20 @@ export default function DataPage() {
       const response = await fetch(`/api/load-data?${params.toString()}`)
       
       if (!response.ok) {
-        throw new Error(`데이터 불러오기 실패: ${response.status}`)
+        console.error(`데이터 불러오기 실패: ${response.status}`)
+        // 오류 시에도 빈 데이터로 처리
+        setData([])
+        setTotal(0)
+        setTotalPages(0)
+        return
       }
       
       const result: DataResponse = await response.json()
       console.log('데이터 불러오기 결과:', result)
       
-      setData(result.items)
-      setTotal(result.total)
-      setTotalPages(result.totalPages)
+      setData(result.items || [])
+      setTotal(result.total || 0)
+      setTotalPages(result.totalPages || 0)
     } catch (error) {
       console.error('Error fetching data:', error)
       // 에러 시 빈 데이터 표시

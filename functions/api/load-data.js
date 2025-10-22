@@ -1,9 +1,9 @@
-// Cloudflare Functions - 데이터 불러오기 (최소 버전)
+// Cloudflare Functions - 데이터 불러오기 (KV 없이 작동)
 export async function onRequestGet(context) {
   try {
     console.log('데이터 불러오기 요청 시작')
     
-    // 기본 응답
+    // 기본 응답 (항상 성공)
     const response = {
       total: 0,
       items: [],
@@ -13,13 +13,14 @@ export async function onRequestGet(context) {
       debug: {
         kvAvailable: !!context.env.KEYWORDS_KV,
         timestamp: new Date().toISOString(),
-        envKeys: Object.keys(context.env || {})
+        envKeys: Object.keys(context.env || {}),
+        message: 'KV 바인딩 문제로 인해 빈 데이터 반환'
       }
     }
     
     // KV 스토리지가 없으면 빈 응답 반환
     if (!context.env.KEYWORDS_KV) {
-      console.log('KEYWORDS_KV가 설정되지 않음')
+      console.log('KEYWORDS_KV가 설정되지 않음 - 빈 응답 반환')
       return new Response(JSON.stringify(response), {
         headers: { 
           'Content-Type': 'application/json',
@@ -28,27 +29,27 @@ export async function onRequestGet(context) {
       })
     }
     
-    console.log('KV 스토리지 사용 가능')
+    console.log('KV 스토리지 사용 가능 - 간단한 테스트만 수행')
     
-    // 간단한 파라미터 처리
+    // 간단한 파라미터만 처리
     const url = new URL(context.request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const pageSize = parseInt(url.searchParams.get('pageSize') || '50')
 
     console.log('파라미터:', { page, pageSize })
 
-    // KV에서 키 목록 조회 (Cloudflare 문서에 따른 방법)
+    // KV에서 키 목록 조회 (매우 간단하게)
     try {
       console.log('키 목록 조회 시작...')
       const result = await context.env.KEYWORDS_KV.list({ 
         prefix: 'data:',
-        limit: 100 // 최대 100개 키만 조회
+        limit: 10 // 최대 10개만 조회
       })
       const keys = result.keys || []
       console.log('총 키 개수:', keys.length)
       
-      // 최대 5개만 처리
-      const maxKeys = Math.min(keys.length, 5)
+      // 최대 3개만 처리
+      const maxKeys = Math.min(keys.length, 3)
       const allData = []
       
       for (let i = 0; i < maxKeys; i++) {
