@@ -32,8 +32,8 @@ export async function onRequestPost(context) {
         let totalDocs = item.total_docs || 0
         let potentialScore = item.potential_score || 0
 
-        // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출
-        if (autoUpdateDocuments && item.rel_keyword) {
+        // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출 (일시적으로 비활성화)
+        if (false && autoUpdateDocuments && item.rel_keyword) {
           try {
             console.log(`문서수 정보 수집 중: ${item.rel_keyword}`)
             
@@ -51,9 +51,12 @@ export async function onRequestPost(context) {
               const openApiData = await openApiResponse.json()
               blogCount = openApiData.total || 0
               console.log(`블로그 문서수: ${blogCount}`)
+            } else {
+              console.log(`OpenAPI 호출 실패: ${openApiResponse.status}`)
             }
           } catch (docError) {
             console.error(`문서수 수집 오류 (${item.rel_keyword}):`, docError)
+            // 오류가 발생해도 기본값으로 계속 진행
           }
         }
 
@@ -89,10 +92,15 @@ export async function onRequestPost(context) {
 
         // KV 스토리지에 저장 (키: data:YYYY-MM-DD:keyword:rel_keyword)
         const storageKey = `data:${dateBucket}:${keyword}:${item.rel_keyword}`
-        await context.env.KEYWORDS_KV.put(storageKey, JSON.stringify(record))
         
-        savedCount++
-        console.log(`저장 완료: ${storageKey}`)
+        try {
+          await context.env.KEYWORDS_KV.put(storageKey, JSON.stringify(record))
+          savedCount++
+          console.log(`저장 완료: ${storageKey}`)
+        } catch (saveError) {
+          console.error(`KV 저장 오류 (${storageKey}):`, saveError)
+          // 저장 실패해도 계속 진행
+        }
       } catch (error) {
         console.error(`데이터 저장 오류 (${item.rel_keyword}):`, error)
       }

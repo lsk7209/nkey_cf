@@ -14,8 +14,21 @@ export async function onRequestGet(context) {
     console.log('파라미터:', { page, pageSize, query, dateFilter, compFilter, sortBy, sortOrder })
 
     // KV 스토리지에서 모든 데이터 키 가져오기
-    const { keys } = await context.env.KEYWORDS_KV.list({ prefix: 'data:' })
-    console.log('총 키 개수:', keys.length)
+    let keys = []
+    try {
+      const result = await context.env.KEYWORDS_KV.list({ prefix: 'data:' })
+      keys = result.keys || []
+      console.log('총 키 개수:', keys.length)
+    } catch (listError) {
+      console.error('키 목록 조회 오류:', listError)
+      return new Response(JSON.stringify({ 
+        error: '데이터 목록을 불러올 수 없습니다.',
+        details: listError.message 
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
 
     // 모든 데이터 로드
     const allData = []
@@ -31,6 +44,7 @@ export async function onRequestGet(context) {
         }
       } catch (error) {
         console.error(`데이터 로드 오류 (${key.name}):`, error)
+        // 개별 데이터 로드 실패는 무시하고 계속 진행
       }
     }
 
