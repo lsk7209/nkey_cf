@@ -99,6 +99,44 @@ export default function DataPage() {
     }
   }
 
+  const handleBulkUpdateDocuments = async () => {
+    if (!confirm('모든 키워드의 문서수를 업데이트하시겠습니까? 시간이 오래 걸릴 수 있습니다.')) {
+      return
+    }
+
+    setIsUpdatingDocs(true)
+    setUpdateProgress('전체 문서수 업데이트를 시작합니다...')
+
+    try {
+      const response = await fetch('/api/bulk-update-documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('대량 문서수 업데이트 실패')
+      }
+
+      const result = await response.json()
+      console.log('대량 문서수 업데이트 결과:', result)
+      
+      setUpdateProgress('전체 문서수 업데이트가 완료되었습니다. 데이터를 새로고침합니다...')
+      
+      // 데이터 새로고침
+      await fetchData()
+      
+      alert(`전체 문서수 업데이트 완료: ${result.updatedCount}개 업데이트됨${result.errorCount > 0 ? `, ${result.errorCount}개 오류` : ''}`)
+    } catch (error) {
+      console.error('대량 문서수 업데이트 오류:', error)
+      alert('전체 문서수 업데이트 중 오류가 발생했습니다.')
+    } finally {
+      setIsUpdatingDocs(false)
+      setUpdateProgress('')
+    }
+  }
+
   const handleUpdateDocuments = async () => {
     if (data.length === 0) {
       alert('업데이트할 데이터가 없습니다.')
@@ -421,6 +459,15 @@ export default function DataPage() {
             >
               <Database className="h-4 w-4" />
               {isUpdatingDocs ? '문서수 수집 중...' : '문서수 자동 수집'}
+            </button>
+            
+            <button
+              onClick={handleBulkUpdateDocuments}
+              disabled={isUpdatingDocs}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+            >
+              <Database className="h-4 w-4" />
+              전체 문서수 업데이트
             </button>
             
             <button
