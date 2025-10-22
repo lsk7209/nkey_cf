@@ -11,4 +11,4 @@ kv_namespaces = [
 ]
 
 [env.production]
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", KV_BINDING_FORCE_RELOAD = "2025-01-22" }
