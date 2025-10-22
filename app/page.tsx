@@ -100,13 +100,32 @@ export default function Home() {
             const pcSearchValue = item.monthlyPcQcCnt || 0
             const mobileSearchValue = item.monthlyMobileQcCnt || 0
             
-            // 숫자 또는 문자열 모두 처리
-            const pcSearch = typeof pcSearchValue === 'string' 
-              ? Math.max(parseInt(pcSearchValue.replace(/[<>\s]/g, '')) || 10, 10)
-              : Math.max(pcSearchValue, 10)
-            const mobileSearch = typeof mobileSearchValue === 'string'
-              ? Math.max(parseInt(mobileSearchValue.replace(/[<>\s]/g, '')) || 10, 10)
-              : Math.max(mobileSearchValue, 10)
+            // 숫자 또는 문자열 모두 처리 - 안전한 replace 처리
+            let pcSearch: number
+            if (typeof pcSearchValue === 'string') {
+              // 문자열인 경우 replace 함수 사용 가능 여부 확인
+              if (typeof pcSearchValue.replace === 'function') {
+                const cleanedValue = pcSearchValue.replace(/[<>\s]/g, '')
+                pcSearch = Math.max(parseInt(cleanedValue) || 10, 10)
+              } else {
+                // replace 함수가 없는 경우 직접 처리
+                pcSearch = Math.max(parseInt(pcSearchValue) || 10, 10)
+              }
+            } else {
+              pcSearch = Math.max(pcSearchValue, 10)
+            }
+
+            let mobileSearch: number
+            if (typeof mobileSearchValue === 'string') {
+              if (typeof mobileSearchValue.replace === 'function') {
+                const cleanedValue = mobileSearchValue.replace(/[<>\s]/g, '')
+                mobileSearch = Math.max(parseInt(cleanedValue) || 10, 10)
+              } else {
+                mobileSearch = Math.max(parseInt(mobileSearchValue) || 10, 10)
+              }
+            } else {
+              mobileSearch = Math.max(mobileSearchValue, 10)
+            }
             
             // 문서수 계산
             const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web

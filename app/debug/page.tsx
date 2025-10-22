@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, XCircle, AlertCircle, Bug, RefreshCw } from 'lucide-react'
+import { CheckCircle, XCircle, AlertCircle, Bug, RefreshCw, Search, Database, Eye, Code } from 'lucide-react'
 
 interface DebugInfo {
   timestamp: string
@@ -48,11 +48,31 @@ interface DebugInfo {
   message: string
 }
 
+interface ProcessingLog {
+  timestamp: string
+  keyword: string
+  step: string
+  data: any
+  error?: string
+  success: boolean
+}
+
+interface DataAnalysis {
+  rawSearchAdData: any
+  rawOpenApiData: any
+  normalizedData: any
+  processingSteps: ProcessingLog[]
+}
+
 export default function DebugPage() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [testKeyword, setTestKeyword] = useState('')
+  const [processingData, setProcessingData] = useState<DataAnalysis | null>(null)
+  const [processingLoading, setProcessingLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'processing' | 'data-analysis'>('overview')
 
   useEffect(() => {
     fetchDebugInfo()
@@ -76,6 +96,207 @@ export default function DebugPage() {
       setError(err instanceof Error ? err.message : '디버그 정보 확인 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const testKeywordProcessing = async () => {
+    if (!testKeyword.trim()) {
+      setError('테스트할 키워드를 입력해주세요.')
+      return
+    }
+
+    setProcessingLoading(true)
+    setError('')
+    setProcessingData(null)
+
+    try {
+      const processingSteps: ProcessingLog[] = []
+      
+      // Step 1: SearchAd API 호출
+      processingSteps.push({
+        timestamp: new Date().toISOString(),
+        keyword: testKeyword,
+        step: 'SearchAd API 호출 시작',
+        data: { keyword: testKeyword },
+        success: true
+      })
+
+      const searchAdResponse = await fetch('/api/searchad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords: [testKeyword] })
+      })
+
+      const searchAdData = await searchAdResponse.json()
+      
+      processingSteps.push({
+        timestamp: new Date().toISOString(),
+        keyword: testKeyword,
+        step: 'SearchAd API 응답 수신',
+        data: {
+          status: searchAdResponse.status,
+          data: searchAdData
+        },
+        success: searchAdResponse.ok
+      })
+
+      // Step 2: OpenAPI 호출
+      processingSteps.push({
+        timestamp: new Date().toISOString(),
+        keyword: testKeyword,
+        step: 'OpenAPI 호출 시작',
+        data: { keyword: testKeyword },
+        success: true
+      })
+
+      const openApiResponse = await fetch('/api/openapi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: testKeyword })
+      })
+
+      const openApiData = await openApiResponse.json()
+      
+      processingSteps.push({
+        timestamp: new Date().toISOString(),
+        keyword: testKeyword,
+        step: 'OpenAPI 응답 수신',
+        data: {
+          status: openApiResponse.status,
+          data: openApiData
+        },
+        success: openApiResponse.ok
+      })
+
+      // Step 3: 데이터 정규화 과정 상세 분석
+      if (searchAdData.keywordList && Array.isArray(searchAdData.keywordList)) {
+        const normalizedData = []
+        
+        for (let i = 0; i < searchAdData.keywordList.length; i++) {
+          const item = searchAdData.keywordList[i]
+          
+          processingSteps.push({
+            timestamp: new Date().toISOString(),
+            keyword: testKeyword,
+            step: `키워드 ${i + 1} 정규화 시작`,
+            data: { originalItem: item },
+            success: true
+          })
+
+          try {
+            // 검색량 정규화 과정 상세 로깅
+            const pcSearchValue = item.monthlyPcQcCnt || 0
+            const mobileSearchValue = item.monthlyMobileQcCnt || 0
+            
+            processingSteps.push({
+              timestamp: new Date().toISOString(),
+              keyword: testKeyword,
+              step: `키워드 ${i + 1} PC 검색량 처리`,
+              data: {
+                originalValue: pcSearchValue,
+                type: typeof pcSearchValue,
+                isString: typeof pcSearchValue === 'string',
+                hasReplace: typeof pcSearchValue === 'string' && typeof pcSearchValue.replace === 'function'
+              },
+              success: true
+            })
+
+            let pcSearch: number
+            if (typeof pcSearchValue === 'string') {
+              // 문자열인 경우 replace 함수 사용 가능 여부 확인
+              if (typeof pcSearchValue.replace === 'function') {
+                const cleanedValue = pcSearchValue.replace(/[<>\s]/g, '')
+                pcSearch = Math.max(parseInt(cleanedValue) || 10, 10)
+              } else {
+                // replace 함수가 없는 경우 직접 처리
+                pcSearch = Math.max(parseInt(pcSearchValue) || 10, 10)
+              }
+            } else {
+              pcSearch = Math.max(pcSearchValue, 10)
+            }
+
+            processingSteps.push({
+              timestamp: new Date().toISOString(),
+              keyword: testKeyword,
+              step: `키워드 ${i + 1} 모바일 검색량 처리`,
+              data: {
+                originalValue: mobileSearchValue,
+                type: typeof mobileSearchValue,
+                isString: typeof mobileSearchValue === 'string',
+                hasReplace: typeof mobileSearchValue === 'string' && typeof mobileSearchValue.replace === 'function'
+              },
+              success: true
+            })
+
+            let mobileSearch: number
+            if (typeof mobileSearchValue === 'string') {
+              if (typeof mobileSearchValue.replace === 'function') {
+                const cleanedValue = mobileSearchValue.replace(/[<>\s]/g, '')
+                mobileSearch = Math.max(parseInt(cleanedValue) || 10, 10)
+              } else {
+                mobileSearch = Math.max(parseInt(mobileSearchValue) || 10, 10)
+              }
+            } else {
+              mobileSearch = Math.max(mobileSearchValue, 10)
+            }
+
+            // 문서수 계산
+            const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web
+            const potentialScore = ((pcSearch + mobileSearch) / Math.max(totalDocs, 1)) * 100
+
+            const normalizedItem = {
+              rel_keyword: item.relKeyword || '',
+              pc_search: pcSearch,
+              mobile_search: mobileSearch,
+              total_search: pcSearch + mobileSearch,
+              ctr_pc: parseFloat(item.monthlyAvePcCtr?.toString() || '0'),
+              ctr_mo: parseFloat(item.monthlyAveMobileCtr?.toString() || '0'),
+              ad_count: parseInt(item.plAvgDepth || '0'),
+              comp_idx: item.compIdx || '중간',
+              blog_count: openApiData.blog,
+              cafe_count: openApiData.cafe,
+              news_count: openApiData.news,
+              web_count: openApiData.web,
+              total_docs: totalDocs,
+              potential_score: potentialScore,
+              seed_usage: 'N/A',
+              source: 'fresh' as const
+            }
+
+            normalizedData.push(normalizedItem)
+
+            processingSteps.push({
+              timestamp: new Date().toISOString(),
+              keyword: testKeyword,
+              step: `키워드 ${i + 1} 정규화 완료`,
+              data: { normalizedItem },
+              success: true
+            })
+
+          } catch (normalizeError) {
+            processingSteps.push({
+              timestamp: new Date().toISOString(),
+              keyword: testKeyword,
+              step: `키워드 ${i + 1} 정규화 오류`,
+              data: { originalItem: item },
+              error: normalizeError instanceof Error ? normalizeError.message : '알 수 없는 오류',
+              success: false
+            })
+          }
+        }
+
+        setProcessingData({
+          rawSearchAdData: searchAdData,
+          rawOpenApiData: openApiData,
+          normalizedData: normalizedData,
+          processingSteps: processingSteps
+        })
+      }
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '키워드 처리 테스트 중 오류가 발생했습니다.')
+    } finally {
+      setProcessingLoading(false)
     }
   }
 
@@ -118,6 +339,45 @@ export default function DebugPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 탭 네비게이션 */}
+        <div className="mb-6">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'overview'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Bug className="inline h-4 w-4 mr-2" />
+              시스템 개요
+            </button>
+            <button
+              onClick={() => setActiveTab('processing')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'processing'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Search className="inline h-4 w-4 mr-2" />
+              키워드 처리 테스트
+            </button>
+            <button
+              onClick={() => setActiveTab('data-analysis')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'data-analysis'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Code className="inline h-4 w-4 mr-2" />
+              데이터 분석
+            </button>
+          </nav>
+        </div>
+
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
@@ -134,7 +394,7 @@ export default function DebugPage() {
               다시 시도
             </button>
           </div>
-        ) : debugInfo ? (
+        ) : activeTab === 'overview' && debugInfo ? (
           <div className="space-y-6">
             {/* 요약 정보 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -416,6 +676,153 @@ export default function DebugPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 디버그 정보 새로고침
               </button>
+            </div>
+          </div>
+        ) : activeTab === 'processing' ? (
+          <div className="space-y-6">
+            {/* 키워드 처리 테스트 섹션 */}
+            <div className="card">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                키워드 처리 테스트
+              </h2>
+              <p className="text-gray-600 mb-4">
+                특정 키워드에 대해 API 호출부터 데이터 정규화까지의 전체 과정을 상세히 분석합니다.
+              </p>
+              
+              <div className="flex gap-4 mb-6">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="테스트할 키워드를 입력하세요 (예: 마케팅)"
+                    value={testKeyword}
+                    onChange={(e) => setTestKeyword(e.target.value)}
+                    className="input-field"
+                    onKeyPress={(e) => e.key === 'Enter' && testKeywordProcessing()}
+                  />
+                </div>
+                <button
+                  onClick={testKeywordProcessing}
+                  disabled={processingLoading}
+                  className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Search className="h-4 w-4" />
+                  {processingLoading ? '처리중...' : '테스트 시작'}
+                </button>
+              </div>
+
+              {processingData && (
+                <div className="space-y-4">
+                  <h3 className="text-md font-medium text-gray-800">처리 결과 요약</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="text-sm text-blue-600 font-medium">처리 단계</div>
+                      <div className="text-2xl font-bold text-blue-800">
+                        {processingData.processingSteps.length}
+                      </div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="text-sm text-green-600 font-medium">성공 단계</div>
+                      <div className="text-2xl font-bold text-green-800">
+                        {processingData.processingSteps.filter(step => step.success).length}
+                      </div>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <div className="text-sm text-red-600 font-medium">실패 단계</div>
+                      <div className="text-2xl font-bold text-red-800">
+                        {processingData.processingSteps.filter(step => !step.success).length}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 처리 단계 상세 로그 */}
+            {processingData && (
+              <div className="card">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  처리 단계 상세 로그
+                </h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {processingData.processingSteps.map((step, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border ${
+                        step.success
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          {step.success ? (
+                            <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-500 mr-2" />
+                          )}
+                          <span className="font-medium text-sm">
+                            {step.step}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {new Date(step.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      
+                      {step.error && (
+                        <div className="text-sm text-red-600 mb-2">
+                          오류: {step.error}
+                        </div>
+                      )}
+                      
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                          데이터 상세 보기
+                        </summary>
+                        <pre className="mt-2 p-2 bg-gray-100 rounded overflow-auto max-h-32">
+                          {JSON.stringify(step.data, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'data-analysis' && processingData ? (
+          <div className="space-y-6">
+            {/* 원본 데이터 분석 */}
+            <div className="card">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                SearchAd API 원본 데이터
+              </h3>
+              <div className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-64">
+                <pre className="text-xs">
+                  {JSON.stringify(processingData.rawSearchAdData, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                OpenAPI 원본 데이터
+              </h3>
+              <div className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-64">
+                <pre className="text-xs">
+                  {JSON.stringify(processingData.rawOpenApiData, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                정규화된 데이터
+              </h3>
+              <div className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-64">
+                <pre className="text-xs">
+                  {JSON.stringify(processingData.normalizedData, null, 2)}
+                </pre>
+              </div>
             </div>
           </div>
         ) : null}
