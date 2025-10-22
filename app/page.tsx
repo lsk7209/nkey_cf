@@ -95,10 +95,16 @@ export default function Home() {
           // 데이터 정규화 (네이버 API 응답 필드에 맞게 수정)
           const normalizedData = searchAdData.keywordList?.map((item: any) => {
             // 검색량 정규화 (< 10 처리)
-            const pcSearchStr = item.monthlyPcQcCnt || '0'
-            const mobileSearchStr = item.monthlyMobileQcCnt || '0'
-            const pcSearch = Math.max(parseInt(pcSearchStr.replace(/[<>\s]/g, '')) || 10, 10)
-            const mobileSearch = Math.max(parseInt(mobileSearchStr.replace(/[<>\s]/g, '')) || 10, 10)
+            const pcSearchValue = item.monthlyPcQcCnt || 0
+            const mobileSearchValue = item.monthlyMobileQcCnt || 0
+            
+            // 숫자 또는 문자열 모두 처리
+            const pcSearch = typeof pcSearchValue === 'string' 
+              ? Math.max(parseInt(pcSearchValue.replace(/[<>\s]/g, '')) || 10, 10)
+              : Math.max(pcSearchValue, 10)
+            const mobileSearch = typeof mobileSearchValue === 'string'
+              ? Math.max(parseInt(mobileSearchValue.replace(/[<>\s]/g, '')) || 10, 10)
+              : Math.max(mobileSearchValue, 10)
             
             // 문서수 계산
             const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web
