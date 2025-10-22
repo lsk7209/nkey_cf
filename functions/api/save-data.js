@@ -50,15 +50,29 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 3) 저장 로직
+    // 3) 배치 저장 로직 (타임아웃 방지를 위해 배치 처리)
+    const BATCH_SIZE = 20; // 한 번에 20개씩 처리
+    const maxItems = Math.min(related.length, 500);
     const now = new Date();
     const dateBucket = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,"0")}-${String(now.getUTCDate()).padStart(2,"0")}`;
     const fetchedAt = now.toISOString();
     let savedCount = 0;
+    let errorCount = 0;
 
-    for (const item of related) {
-      const rel = item?.rel_keyword ?? "";
-      if (!rel) continue;
+    console.log(`배치 저장 시작: 총 ${related.length}개 중 최대 ${maxItems}개 처리 (배치 크기: ${BATCH_SIZE})`);
+
+    // 배치별로 처리
+    for (let batchStart = 0; batchStart < maxItems; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, maxItems);
+      const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(maxItems / BATCH_SIZE);
+      
+      console.log(`배치 ${batchNumber}/${totalBatches} 처리 중: ${batchStart + 1}-${batchEnd}번째 항목`);
+
+      for (let i = batchStart; i < batchEnd; i++) {
+        const item = related[i];
+        const rel = item?.rel_keyword ?? "";
+        if (!rel) continue;
 
       try {
         // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출
@@ -71,17 +85,23 @@ export async function onRequestPost(context) {
 
         if (autoUpdateDocuments && rel) {
           try {
-            console.log(`문서수 정보 수집 중: ${rel}`);
+            console.log(`문서수 정보 수집 중 (${i+1}/${maxItems}): ${rel}`);
             
-            // OpenAPI 호출하여 문서수 정보 가져오기
+            // OpenAPI 호출하여 문서수 정보 가져오기 (타임아웃 5초)
             const query = encodeURIComponent(rel);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
             const openApiResponse = await fetch(`https://openapi.naver.com/v1/search/blog.json?query=${query}&display=1`, {
               method: 'GET',
               headers: {
                 'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
                 'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
-              }
+              },
+              signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (openApiResponse.ok) {
               const openApiData = await openApiResponse.json();
@@ -91,7 +111,8 @@ export async function onRequestPost(context) {
               console.log(`OpenAPI 호출 실패: ${openApiResponse.status}`);
             }
           } catch (docError) {
-            console.error(`문서수 수집 오류 (${rel}):`, docError);
+            console.error(`문서수 수집 오류 (${rel}):`, docError.message);
+            // OpenAPI 오류가 있어도 기본값으로 저장 계속 진행
           }
         }
 
@@ -125,39 +146,63 @@ export async function onRequestPost(context) {
         const storageKey = `data:${dateBucket}:${keyword}:${rel}`;
         
         try {
-          console.log(`저장 시도: ${storageKey}`);
+          console.log(`저장 시도 (${i+1}/${maxItems}): ${storageKey}`);
           
-          // Cloudflare KV 문서에 따른 저장 방법
+          // 중복 체크 (기존 데이터가 있는지 확인)
+          const existingData = await env.KEYWORDS_KV.get(storageKey);
+          const isUpdate = !!existingData;
+          
+          if (isUpdate) {
+            console.log(`중복 키워드 발견 - 덮어쓰기: ${rel}`);
+            // 기존 데이터가 있으면 업데이트 시간 추가
+            record.updated_at = fetchedAt;
+            record.is_update = true;
+          } else {
+            record.created_at = fetchedAt;
+            record.is_update = false;
+          }
+          
+          // Cloudflare KV 문서에 따른 저장 방법 (덮어쓰기)
           const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
             expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
           });
           
-          console.log(`저장 결과:`, putResult);
           savedCount++;
-          console.log(`저장 완료: ${storageKey}`);
+          console.log(`${isUpdate ? '업데이트' : '신규 저장'} 완료 (${savedCount}/${maxItems}): ${rel}`);
         } catch (saveError) {
-          console.error(`KV 저장 오류 (${storageKey}):`, saveError);
-          console.error(`오류 상세:`, {
-            message: saveError.message,
-            stack: saveError.stack,
-            name: saveError.name
-          });
+          errorCount++;
+          console.error(`KV 저장 오류 (${storageKey}):`, saveError.message);
         }
       } catch (error) {
-        console.error(`데이터 저장 오류 (${rel}):`, error);
+        errorCount++;
+        console.error(`데이터 저장 오류 (${rel}):`, error.message);
       }
-    }
+      } // 배치 내부 루프 종료
+      
+      // 배치 간 짧은 대기 (타임아웃 방지)
+      if (batchEnd < maxItems) {
+        console.log(`배치 ${batchNumber} 완료. 다음 배치 준비 중...`);
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms 대기
+      }
+    } // 배치 루프 종료
 
     const result = {
       success: true,
       keyword,
       savedCount,
       totalCount: related.length,
+      maxItems,
+      errorCount,
+      batchSize: BATCH_SIZE,
+      totalBatches: Math.ceil(maxItems / BATCH_SIZE),
       dateBucket,
       fetchedAt,
+      message: `배치 처리 완료: 총 ${related.length}개 중 ${maxItems}개 처리, ${savedCount}개 저장 완료${errorCount > 0 ? ` (${errorCount}개 오류)` : ''}`,
       debug: {
         kvAvailable: true,
         autoUpdateDocuments,
+        overwriteMode: true,
+        batchProcessing: true,
         timestamp: new Date().toISOString()
       }
     };
