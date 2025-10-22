@@ -15,6 +15,8 @@ interface KeywordRecord {
   blog_count: number
   web_count: number
   news_count: number
+  total_docs: number
+  potential_score: number
   ctr_pc: number
   ctr_mo: number
   ad_count: number
@@ -95,6 +97,8 @@ export default function DataPage() {
         '블로그문서수',
         '웹문서수',
         '뉴스문서수',
+        '총문서수',
+        '잠재력점수',
         'PC CTR',
         '모바일 CTR',
         '광고수',
@@ -115,6 +119,8 @@ export default function DataPage() {
           item.blog_count,
           item.web_count,
           item.news_count,
+          item.total_docs || (item.cafe_count + item.blog_count + item.web_count + item.news_count),
+          item.potential_score || 0,
           item.ctr_pc,
           item.ctr_mo,
           item.ad_count,
@@ -328,6 +334,12 @@ export default function DataPage() {
                         뉴스문서수
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        총문서수
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        잠재력점수
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         PC CTR
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -373,6 +385,18 @@ export default function DataPage() {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatNumber(item.news_count)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatNumber(item.total_docs || (item.cafe_count + item.blog_count + item.web_count + item.news_count))}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            (item.potential_score || 0) > 10 ? 'bg-green-100 text-green-800' :
+                            (item.potential_score || 0) > 5 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {(item.potential_score || 0).toFixed(1)}
+                          </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {item.ctr_pc}%

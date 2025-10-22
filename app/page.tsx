@@ -62,37 +62,21 @@ export default function Home() {
         try {
           console.log(`키워드 "${keyword}" 처리 시작`)
           
-          // SearchAd API와 OpenAPI 병렬 호출
-          const [searchAdResponse, openApiResponse] = await Promise.all([
-            fetch('/api/searchad', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ keywords: [keyword] })
-            }),
-            fetch('/api/openapi', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ keyword })
-            })
-          ])
+          // SearchAd API만 호출 (검색 결과 표시용)
+          const searchAdResponse = await fetch('/api/searchad', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keywords: [keyword] })
+          })
 
           console.log('SearchAd 응답 상태:', searchAdResponse.status)
-          console.log('OpenAPI 응답 상태:', openApiResponse.status)
 
           if (!searchAdResponse.ok) {
             throw new Error(`SearchAd API 오류: ${searchAdResponse.status}`)
           }
-          if (!openApiResponse.ok) {
-            throw new Error(`OpenAPI 오류: ${openApiResponse.status}`)
-          }
 
-          const [searchAdData, openApiData] = await Promise.all([
-            searchAdResponse.json(),
-            openApiResponse.json()
-          ])
-
+          const searchAdData = await searchAdResponse.json()
           console.log('SearchAd 데이터:', searchAdData)
-          console.log('OpenAPI 데이터:', openApiData)
 
           // 데이터 정규화 (네이버 API 응답 필드에 맞게 수정)
           const normalizedData = searchAdData.keywordList?.map((item: any) => {
@@ -127,10 +111,6 @@ export default function Home() {
               mobileSearch = Math.max(mobileSearchValue, 10)
             }
             
-            // 문서수 계산
-            const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web
-            const potentialScore = ((pcSearch + mobileSearch) / Math.max(totalDocs, 1)) * 100
-
             return {
               rel_keyword: item.relKeyword || '',
               pc_search: pcSearch,
@@ -140,13 +120,13 @@ export default function Home() {
               ctr_mo: parseFloat(item.monthlyAveMobileCtr?.toString() || '0'),
               ad_count: parseInt(item.plAvgDepth || '0'),
               comp_idx: item.compIdx || '중간',
-              blog_count: openApiData.blog,
-              cafe_count: openApiData.cafe,
-              news_count: openApiData.news,
-              web_count: openApiData.web,
-              total_docs: totalDocs,
-              potential_score: potentialScore,
-              seed_usage: 'N/A', // 시드활용 필드 추가
+              blog_count: 0, // 문서수는 나중에 자동으로 추가
+              cafe_count: 0,
+              news_count: 0,
+              web_count: 0,
+              total_docs: 0,
+              potential_score: 0,
+              seed_usage: 'N/A',
               source: 'fresh' as const
             }
           }) || []
@@ -156,20 +136,21 @@ export default function Home() {
             related: normalizedData
           })
 
-          // 데이터 자동 저장
+          // 데이터 자동 저장 및 문서수 정보 자동 추가
           try {
             const saveResponse = await fetch('/api/save-data', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 keyword,
-                related: normalizedData
+                related: normalizedData,
+                autoUpdateDocuments: true // 문서수 자동 업데이트 플래그
               })
             })
             
             if (saveResponse.ok) {
               const saveResult = await saveResponse.json()
-              console.log(`데이터 저장 완료 (${keyword}):`, saveResult)
+              console.log(`데이터 저장 및 문서수 업데이트 완료 (${keyword}):`, saveResult)
             } else {
               console.error(`데이터 저장 실패 (${keyword}):`, saveResponse.status)
             }
@@ -337,18 +318,6 @@ export default function Home() {
                           총 검색량
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          카페문서수
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          블로그문서수
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          웹문서수
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          뉴스문서수
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           PC CTR
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -359,9 +328,6 @@ export default function Home() {
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           경쟁지수
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          시드활용
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           상태
@@ -384,18 +350,6 @@ export default function Home() {
                             {formatNumber(item.total_search)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatNumber(item.cafe_count)}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatNumber(item.blog_count)}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatNumber(item.web_count)}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatNumber(item.news_count)}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                             {item.ctr_pc}%
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -412,9 +366,6 @@ export default function Home() {
                             }`}>
                               {item.comp_idx}
                             </span>
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.seed_usage}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                             {getSourceBadge(item.source)}

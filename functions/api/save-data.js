@@ -2,9 +2,10 @@
 export async function onRequestPost(context) {
   try {
     console.log('데이터 저장 요청 시작')
-    const { keyword, related } = await context.request.json()
+    const { keyword, related, autoUpdateDocuments } = await context.request.json()
     console.log('저장할 키워드:', keyword)
     console.log('관련 키워드 개수:', related?.length || 0)
+    console.log('문서수 자동 업데이트:', autoUpdateDocuments)
     
     if (!keyword || !related || !Array.isArray(related)) {
       return new Response(JSON.stringify({ error: '키워드와 관련 데이터가 필요합니다.' }), {
@@ -24,6 +25,44 @@ export async function onRequestPost(context) {
     // 각 관련 키워드 데이터를 저장
     for (const item of related) {
       try {
+        let blogCount = item.blog_count || 0
+        let cafeCount = item.cafe_count || 0
+        let newsCount = item.news_count || 0
+        let webCount = item.web_count || 0
+        let totalDocs = item.total_docs || 0
+        let potentialScore = item.potential_score || 0
+
+        // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출
+        if (autoUpdateDocuments && item.rel_keyword) {
+          try {
+            console.log(`문서수 정보 수집 중: ${item.rel_keyword}`)
+            
+            // OpenAPI 호출하여 문서수 정보 가져오기
+            const query = encodeURIComponent(item.rel_keyword)
+            const openApiResponse = await fetch(`https://openapi.naver.com/v1/search/blog.json?query=${query}&display=1`, {
+              method: 'GET',
+              headers: {
+                'X-Naver-Client-Id': context.env.NAVER_CLIENT_ID,
+                'X-Naver-Client-Secret': context.env.NAVER_CLIENT_SECRET
+              }
+            })
+            
+            if (openApiResponse.ok) {
+              const openApiData = await openApiResponse.json()
+              blogCount = openApiData.total || 0
+              console.log(`블로그 문서수: ${blogCount}`)
+            }
+          } catch (docError) {
+            console.error(`문서수 수집 오류 (${item.rel_keyword}):`, docError)
+          }
+        }
+
+        // 총 문서수 및 잠재력 점수 계산
+        totalDocs = blogCount + cafeCount + newsCount + webCount
+        if (totalDocs > 0) {
+          potentialScore = ((item.pc_search + item.mobile_search) / totalDocs) * 100
+        }
+
         // D1 데이터베이스에 저장 (실제 구현에서는 D1 사용)
         // 현재는 로컬 스토리지나 KV 스토리지 사용
         const record = {
@@ -37,12 +76,12 @@ export async function onRequestPost(context) {
           ctr_mo: item.ctr_mo,
           ad_count: item.ad_count,
           comp_idx: item.comp_idx,
-          blog_count: item.blog_count,
-          cafe_count: item.cafe_count,
-          news_count: item.news_count,
-          web_count: item.web_count,
-          total_docs: item.total_docs,
-          potential_score: item.potential_score,
+          blog_count: blogCount,
+          cafe_count: cafeCount,
+          news_count: newsCount,
+          web_count: webCount,
+          total_docs: totalDocs,
+          potential_score: potentialScore,
           seed_usage: item.seed_usage || 'N/A',
           raw_json: JSON.stringify(item),
           fetched_at: fetchedAt
