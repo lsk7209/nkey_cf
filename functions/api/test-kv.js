@@ -3,6 +3,30 @@ export async function onRequestGet(context) {
   try {
     console.log('KV 스토리지 테스트 시작')
     
+    // 환경 변수 확인
+    const envInfo = {
+      KEYWORDS_KV: !!context.env.KEYWORDS_KV,
+      envKeys: Object.keys(context.env || {}),
+      timestamp: new Date().toISOString()
+    }
+    
+    console.log('환경 정보:', envInfo)
+    
+    // KV 스토리지가 없으면 환경 정보만 반환
+    if (!context.env.KEYWORDS_KV) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'KEYWORDS_KV 바인딩이 없습니다',
+        envInfo,
+        suggestion: 'wrangler.toml에서 KV 바인딩을 확인하세요'
+      }), {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      })
+    }
+    
     // 테스트 데이터 저장
     const testKey = 'test:kv:storage'
     const testData = {
@@ -28,6 +52,7 @@ export async function onRequestGet(context) {
     const result = {
       success: true,
       message: 'KV 스토리지 테스트 성공',
+      envInfo,
       testData: JSON.parse(retrievedData),
       keyCount: keys.length,
       timestamp: new Date().toISOString()
@@ -44,6 +69,7 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message || 'KV 스토리지 테스트 중 오류가 발생했습니다.',
+      stack: error.stack,
       timestamp: new Date().toISOString()
     }), {
       status: 500,

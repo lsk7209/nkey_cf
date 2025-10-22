@@ -1,4 +1,4 @@
-// Cloudflare Functions - 데이터 불러오기
+// Cloudflare Functions - 데이터 불러오기 (간소화 버전)
 export async function onRequestGet(context) {
   try {
     console.log('데이터 불러오기 요청 시작')
@@ -9,12 +9,16 @@ export async function onRequestGet(context) {
       items: [],
       page: 1,
       pageSize: 50,
-      totalPages: 0
+      totalPages: 0,
+      debug: {
+        kvAvailable: !!context.env.KEYWORDS_KV,
+        timestamp: new Date().toISOString()
+      }
     }
     
     // KV 스토리지가 없으면 빈 응답 반환
     if (!context.env.KEYWORDS_KV) {
-      console.log('KEYWORDS_KV가 설정되지 않음')
+      console.log('KEYWORDS_KV가 설정되지 않음 - 빈 응답 반환')
       return new Response(JSON.stringify(defaultResponse), {
         headers: { 
           'Content-Type': 'application/json',
@@ -23,148 +27,107 @@ export async function onRequestGet(context) {
       })
     }
     
+    console.log('KV 스토리지 사용 가능 - 데이터 조회 시작')
+    
+    // 간단한 파라미터만 처리
     const url = new URL(context.request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const pageSize = parseInt(url.searchParams.get('pageSize') || '50')
-    const query = url.searchParams.get('query') || ''
-    const dateFilter = url.searchParams.get('dateFilter') || 'all'
-    const compFilter = url.searchParams.get('compFilter') || 'all'
-    const sortBy = url.searchParams.get('sortBy') || 'fetched_at'
-    const sortOrder = url.searchParams.get('sortOrder') || 'desc'
 
-    console.log('파라미터:', { page, pageSize, query, dateFilter, compFilter, sortBy, sortOrder })
+    console.log('파라미터:', { page, pageSize })
 
-    // KV 스토리지에서 모든 데이터 키 가져오기
+    // KV 스토리지에서 데이터 키 가져오기 (간소화)
     let keys = []
     try {
+      console.log('키 목록 조회 시작...')
       const result = await context.env.KEYWORDS_KV.list({ prefix: 'data:' })
       keys = result.keys || []
       console.log('총 키 개수:', keys.length)
     } catch (listError) {
       console.error('키 목록 조회 오류:', listError)
       return new Response(JSON.stringify({ 
-        error: '데이터 목록을 불러올 수 없습니다.',
-        details: listError.message 
+        ...defaultResponse,
+        error: '키 목록 조회 실패',
+        debug: {
+          ...defaultResponse.debug,
+          listError: listError.message
+        }
       }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
       })
     }
 
-    // 모든 데이터 로드
+    // 데이터 로드 (최대 10개만)
     const allData = []
-    for (const key of keys) {
+    const maxKeys = Math.min(keys.length, 10)
+    console.log(`처리할 키 개수: ${maxKeys}`)
+    
+    for (let i = 0; i < maxKeys; i++) {
+      const key = keys[i]
       try {
+        console.log(`데이터 로드 중: ${key.name}`)
         const data = await context.env.KEYWORDS_KV.get(key.name)
         if (data) {
           const record = JSON.parse(data)
           allData.push({
-            id: key.name, // 키를 ID로 사용
+            id: key.name,
             ...record
           })
+          console.log(`데이터 로드 성공: ${key.name}`)
         }
       } catch (error) {
         console.error(`데이터 로드 오류 (${key.name}):`, error)
-        // 개별 데이터 로드 실패는 무시하고 계속 진행
       }
     }
 
     console.log('로드된 데이터 개수:', allData.length)
 
-    // 필터링
-    let filteredData = allData
-
-    // 키워드 검색 필터
-    if (query) {
-      filteredData = filteredData.filter(item => 
-        item.keyword.toLowerCase().includes(query.toLowerCase()) ||
-        item.rel_keyword.toLowerCase().includes(query.toLowerCase())
-      )
-    }
-
-    // 날짜 필터
-    if (dateFilter !== 'all') {
-      const today = new Date()
-      let cutoffDate = null
-      
-      switch (dateFilter) {
-        case 'today':
-          cutoffDate = today.toISOString().split('T')[0]
-          break
-        case '7days':
-          cutoffDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-          break
-        case '30days':
-          cutoffDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-          break
-      }
-      
-      if (cutoffDate) {
-        filteredData = filteredData.filter(item => item.date_bucket >= cutoffDate)
-      }
-    }
-
-    // 경쟁도 필터
-    if (compFilter !== 'all') {
-      const compMap = {
-        'high': '높음',
-        'medium': '중간',
-        'low': '낮음'
-      }
-      const targetComp = compMap[compFilter]
-      if (targetComp) {
-        filteredData = filteredData.filter(item => item.comp_idx === targetComp)
-      }
-    }
-
-    // 정렬
-    filteredData.sort((a, b) => {
-      let aVal = a[sortBy]
-      let bVal = b[sortBy]
-      
-      // 날짜 필드 처리
-      if (sortBy === 'fetched_at' || sortBy === 'date_bucket') {
-        aVal = new Date(aVal).getTime()
-        bVal = new Date(bVal).getTime()
-      }
-      
-      if (sortOrder === 'asc') {
-        return aVal > bVal ? 1 : -1
-      } else {
-        return aVal < bVal ? 1 : -1
-      }
-    })
-
-    // 페이지네이션
-    const total = filteredData.length
+    // 간단한 페이지네이션만 적용
+    const total = allData.length
     const totalPages = Math.ceil(total / pageSize)
     const startIndex = (page - 1) * pageSize
     const endIndex = startIndex + pageSize
-    const paginatedData = filteredData.slice(startIndex, endIndex)
+    const paginatedData = allData.slice(startIndex, endIndex)
 
-    const result = {
+    console.log('최종 결과:', { total, page, pageSize, totalPages, itemsCount: paginatedData.length })
+
+    return new Response(JSON.stringify({
       total,
       items: paginatedData,
       page,
       pageSize,
-      totalPages
-    }
-
-    console.log('데이터 불러오기 완료:', { total, page, totalPages, itemsCount: paginatedData.length })
-    
-    return new Response(JSON.stringify(result), {
+      totalPages,
+      debug: {
+        kvAvailable: true,
+        keysFound: keys.length,
+        dataLoaded: allData.length,
+        timestamp: new Date().toISOString()
+      }
+    }), {
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       }
     })
+
   } catch (error) {
     console.error('데이터 불러오기 오류:', error)
     return new Response(JSON.stringify({ 
-      error: error.message || '데이터 불러오기 중 오류가 발생했습니다.' 
+      error: '데이터 불러오기 실패',
+      details: error.message,
+      debug: {
+        kvAvailable: !!context.env.KEYWORDS_KV,
+        timestamp: new Date().toISOString()
+      }
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     })
   }
 }
