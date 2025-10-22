@@ -58,19 +58,39 @@ export default function Home() {
       
       for (const keyword of keywordList) {
         try {
+          console.log(`키워드 "${keyword}" 처리 시작`)
+          
           // SearchAd API와 OpenAPI 병렬 호출
-          const [searchAdData, openApiData] = await Promise.all([
+          const [searchAdResponse, openApiResponse] = await Promise.all([
             fetch('/api/searchad', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ keywords: [keyword] })
-            }).then(res => res.json()),
+            }),
             fetch('/api/openapi', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ keyword })
-            }).then(res => res.json())
+            })
           ])
+
+          console.log('SearchAd 응답 상태:', searchAdResponse.status)
+          console.log('OpenAPI 응답 상태:', openApiResponse.status)
+
+          if (!searchAdResponse.ok) {
+            throw new Error(`SearchAd API 오류: ${searchAdResponse.status}`)
+          }
+          if (!openApiResponse.ok) {
+            throw new Error(`OpenAPI 오류: ${openApiResponse.status}`)
+          }
+
+          const [searchAdData, openApiData] = await Promise.all([
+            searchAdResponse.json(),
+            openApiResponse.json()
+          ])
+
+          console.log('SearchAd 데이터:', searchAdData)
+          console.log('OpenAPI 데이터:', openApiData)
 
           // 데이터 정규화
           const normalizedData = searchAdData.keywordList?.map((item: any) => {

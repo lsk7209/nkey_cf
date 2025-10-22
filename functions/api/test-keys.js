@@ -1,6 +1,7 @@
 // Cloudflare Functions - API 키 테스트
 export async function onRequestGet(context) {
   try {
+    console.log('API 키 테스트 시작')
     const searchAdKeys = []
     const openApiKeys = []
     
@@ -9,6 +10,12 @@ export async function onRequestGet(context) {
       const accessLicense = context.env[`SEARCHAD_ACCESS_LICENSE_${i}`]
       const secretKey = context.env[`SEARCHAD_SECRET_KEY_${i}`]
       const customerId = context.env[`SEARCHAD_CUSTOMER_ID_${i}`]
+      
+      console.log(`SearchAd 키 ${i}:`, {
+        hasLicense: !!accessLicense,
+        hasSecret: !!secretKey,
+        hasCustomer: !!customerId
+      })
       
       if (accessLicense && secretKey && customerId) {
         searchAdKeys.push({
@@ -25,6 +32,11 @@ export async function onRequestGet(context) {
       const clientId = context.env[`NAVER_CLIENT_ID_${i}`]
       const clientSecret = context.env[`NAVER_CLIENT_SECRET_${i}`]
       
+      console.log(`OpenAPI 키 ${i}:`, {
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret
+      })
+      
       if (clientId && clientSecret) {
         openApiKeys.push({
           id: i,
@@ -34,12 +46,16 @@ export async function onRequestGet(context) {
       }
     }
     
-    return new Response(JSON.stringify({
+    const result = {
       searchAdKeys,
       openApiKeys,
       totalSearchAdKeys: searchAdKeys.length,
       totalOpenApiKeys: openApiKeys.length
-    }), {
+    }
+    
+    console.log('API 키 테스트 결과:', result)
+    
+    return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (error) {
