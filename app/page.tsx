@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Database, TrendingUp, FileText, Key } from 'lucide-react'
+import { Search, Database, TrendingUp, FileText, Key, Bug } from 'lucide-react'
 
 interface KeywordData {
   rel_keyword: string
@@ -180,6 +180,10 @@ export default function Home() {
               <a href="/api-status" className="flex items-center text-gray-600 hover:text-gray-900">
                 <Key className="h-4 w-4 mr-1" />
                 API 상태
+              </a>
+              <a href="/debug" className="flex items-center text-gray-600 hover:text-gray-900">
+                <Bug className="h-4 w-4 mr-1" />
+                디버그
               </a>
             </nav>
           </div>
