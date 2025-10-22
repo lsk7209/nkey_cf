@@ -53,54 +53,66 @@ export default function Home() {
     setResults([])
 
     try {
-      // 임시 모의 데이터 (API 연동 완료 후 실제 호출로 변경)
-      const mockData = keywordList.map(keyword => ({
-        keyword,
-        related: [
-          {
-            rel_keyword: `${keyword} 관련키워드1`,
-            pc_search: Math.floor(Math.random() * 5000) + 1000,
-            mobile_search: Math.floor(Math.random() * 10000) + 5000,
-            ctr_pc: parseFloat((Math.random() * 5 + 1).toFixed(2)),
-            ctr_mo: parseFloat((Math.random() * 5 + 2).toFixed(2)),
-            ad_count: Math.floor(Math.random() * 20) + 5,
-            comp_idx: ['높음', '중간', '낮음'][Math.floor(Math.random() * 3)],
-            blog_count: Math.floor(Math.random() * 50000) + 10000,
-            cafe_count: Math.floor(Math.random() * 10000) + 2000,
-            news_count: Math.floor(Math.random() * 2000) + 500,
-            web_count: Math.floor(Math.random() * 15000) + 5000,
-            total_docs: 0, // 계산됨
-            potential_score: 0, // 계산됨
-            source: 'fresh' as const
-          },
-          {
-            rel_keyword: `${keyword} 관련키워드2`,
-            pc_search: Math.floor(Math.random() * 3000) + 500,
-            mobile_search: Math.floor(Math.random() * 8000) + 3000,
-            ctr_pc: parseFloat((Math.random() * 4 + 1.5).toFixed(2)),
-            ctr_mo: parseFloat((Math.random() * 4 + 2.5).toFixed(2)),
-            ad_count: Math.floor(Math.random() * 15) + 3,
-            comp_idx: ['높음', '중간', '낮음'][Math.floor(Math.random() * 3)],
-            blog_count: Math.floor(Math.random() * 30000) + 5000,
-            cafe_count: Math.floor(Math.random() * 8000) + 1000,
-            news_count: Math.floor(Math.random() * 1500) + 200,
-            web_count: Math.floor(Math.random() * 10000) + 2000,
-            total_docs: 0, // 계산됨
-            potential_score: 0, // 계산됨
-            source: 'fresh' as const
-          }
-        ]
-      }))
-
-      // 잠재지수 계산
-      mockData.forEach(result => {
-        result.related.forEach(item => {
-          item.total_docs = item.blog_count + item.cafe_count + item.news_count + item.web_count
-          item.potential_score = parseFloat(((item.pc_search + item.mobile_search) / Math.max(item.total_docs, 1) * 100).toFixed(1))
-        })
-      })
+      // 실제 API 호출
+      const results: SearchResult[] = []
       
-      setResults(mockData)
+      for (const keyword of keywordList) {
+        try {
+          // SearchAd API와 OpenAPI 병렬 호출
+          const [searchAdData, openApiData] = await Promise.all([
+            fetch('/api/searchad', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ keywords: [keyword] })
+            }).then(res => res.json()),
+            fetch('/api/openapi', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ keyword })
+            }).then(res => res.json())
+          ])
+
+          // 데이터 정규화
+          const normalizedData = searchAdData.keywordList?.map((item: any) => {
+            const pcSearch = Math.max(item.monthlyPcQcCnt || 0, 10)
+            const mobileSearch = Math.max(item.monthlyMobileQcCnt || 0, 10)
+            const totalDocs = openApiData.blog + openApiData.cafe + openApiData.news + openApiData.web
+            const potentialScore = ((pcSearch + mobileSearch) / Math.max(totalDocs, 1)) * 100
+
+            return {
+              rel_keyword: item.relKeyword || '',
+              pc_search: pcSearch,
+              mobile_search: mobileSearch,
+              ctr_pc: parseFloat(item.plAvgCpc?.toString() || '0'),
+              ctr_mo: parseFloat(item.moAvgCpc?.toString() || '0'),
+              ad_count: parseInt(item.competition || '0'),
+              comp_idx: item.competition === 'HIGH' ? '높음' : 
+                        item.competition === 'MEDIUM' ? '중간' : '낮음',
+              blog_count: openApiData.blog,
+              cafe_count: openApiData.cafe,
+              news_count: openApiData.news,
+              web_count: openApiData.web,
+              total_docs: totalDocs,
+              potential_score: potentialScore,
+              source: 'fresh' as const
+            }
+          }) || []
+
+          results.push({
+            keyword,
+            related: normalizedData
+          })
+        } catch (error) {
+          console.error(`Error processing keyword ${keyword}:`, error)
+          // 에러가 발생해도 다른 키워드는 계속 처리
+          results.push({
+            keyword,
+            related: []
+          })
+        }
+      }
+      
+      setResults(results)
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.')
     } finally {
