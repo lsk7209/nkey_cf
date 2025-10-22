@@ -1,4 +1,5 @@
 // Naver SearchAd API 관련 유틸리티
+import { getAvailableSearchAdKey, getAvailableOpenApiKey, handleApiKeyError, handleApiKeySuccess } from './api-key-manager'
 
 export interface SearchAdResponse {
   keywordList: Array<{
@@ -40,81 +41,109 @@ export async function generateSignature(
   return btoa(String.fromCharCode(...new Uint8Array(signature)))
 }
 
-// Naver SearchAd API 호출
-export async function callSearchAdAPI(
-  keywords: string[],
-  accessLicense: string,
-  secretKey: string,
-  customerId: string
-): Promise<SearchAdResponse> {
+// Naver SearchAd API 호출 (다중 키 지원)
+export async function callSearchAdAPI(keywords: string[]): Promise<SearchAdResponse> {
+  const apiKey = getAvailableSearchAdKey()
+  
+  if (!apiKey) {
+    throw new Error('사용 가능한 SearchAd API 키가 없습니다.')
+  }
+
   const timestamp = Date.now().toString()
   const method = 'POST'
   const uri = '/keywordstool'
   
-  const signature = await generateSignature(secretKey, timestamp, method, uri)
-  
-  const response = await fetch('https://api.naver.com/keywordstool', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Timestamp': timestamp,
-      'X-API-KEY': accessLicense,
-      'X-Customer': customerId,
-      'X-Signature': signature,
-    },
-    body: JSON.stringify({
-      hintKeywords: keywords,
-      showDetail: 1
+  try {
+    const signature = await generateSignature(apiKey.secretKey, timestamp, method, uri)
+    
+    const response = await fetch('https://api.naver.com/keywordstool', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Timestamp': timestamp,
+        'X-API-KEY': apiKey.accessLicense,
+        'X-Customer': apiKey.customerId,
+        'X-Signature': signature,
+      },
+      body: JSON.stringify({
+        hintKeywords: keywords,
+        showDetail: 1
+      })
     })
-  })
 
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new Error('API 호출 제한에 도달했습니다. 잠시 후 다시 시도해주세요.')
+    if (!response.ok) {
+      if (response.status === 429) {
+        handleApiKeyError(apiKey.id, new Error('Rate limit exceeded'))
+        throw new Error('API 호출 제한에 도달했습니다. 잠시 후 다시 시도해주세요.')
+      }
+      handleApiKeyError(apiKey.id, new Error(`HTTP ${response.status}`))
+      throw new Error(`SearchAd API 오류: ${response.status}`)
     }
-    throw new Error(`SearchAd API 오류: ${response.status}`)
-  }
 
-  return response.json()
+    handleApiKeySuccess(apiKey.id)
+    return response.json()
+  } catch (error) {
+    handleApiKeyError(apiKey.id, error)
+    throw error
+  }
 }
 
-// Naver OpenAPI 호출 (병렬)
-export async function callOpenAPI(
-  keyword: string,
-  clientId: string,
-  clientSecret: string
-): Promise<{
+// Naver OpenAPI 호출 (다중 키 지원, 병렬)
+export async function callOpenAPI(keyword: string): Promise<{
   blog: number
   cafe: number
   news: number
   web: number
 }> {
+  const apiKey = getAvailableOpenApiKey()
+  
+  if (!apiKey) {
+    throw new Error('사용 가능한 OpenAPI 키가 없습니다.')
+  }
+
   const baseUrl = 'https://openapi.naver.com/v1/search'
   
   const headers = {
-    'X-Naver-Client-Id': clientId,
-    'X-Naver-Client-Secret': clientSecret,
+    'X-Naver-Client-Id': apiKey.clientId,
+    'X-Naver-Client-Secret': apiKey.clientSecret,
   }
 
-  const [blogRes, cafeRes, newsRes, webRes] = await Promise.all([
-    fetch(`${baseUrl}/blog.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
-    fetch(`${baseUrl}/cafearticle.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
-    fetch(`${baseUrl}/news.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
-    fetch(`${baseUrl}/webkr.json?query=${encodeURIComponent(keyword)}&display=100`, { headers })
-  ])
+  try {
+    const [blogRes, cafeRes, newsRes, webRes] = await Promise.all([
+      fetch(`${baseUrl}/blog.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
+      fetch(`${baseUrl}/cafearticle.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
+      fetch(`${baseUrl}/news.json?query=${encodeURIComponent(keyword)}&display=100`, { headers }),
+      fetch(`${baseUrl}/webkr.json?query=${encodeURIComponent(keyword)}&display=100`, { headers })
+    ])
 
-  const [blogData, cafeData, newsData, webData] = await Promise.all([
-    blogRes.json(),
-    cafeRes.json(),
-    newsRes.json(),
-    webRes.json()
-  ])
+    // 에러 체크
+    if (!blogRes.ok || !cafeRes.ok || !newsRes.ok || !webRes.ok) {
+      if (blogRes.status === 429 || cafeRes.status === 429 || newsRes.status === 429 || webRes.status === 429) {
+        handleApiKeyError(apiKey.id, new Error('Rate limit exceeded'))
+        throw new Error('OpenAPI 호출 제한에 도달했습니다.')
+      }
+      handleApiKeyError(apiKey.id, new Error('HTTP error'))
+      throw new Error('OpenAPI 호출 중 오류가 발생했습니다.')
+    }
 
-  return {
-    blog: blogData.total || 0,
-    cafe: cafeData.total || 0,
-    news: newsData.total || 0,
-    web: webData.total || 0
+    const [blogData, cafeData, newsData, webData] = await Promise.all([
+      blogRes.json(),
+      cafeRes.json(),
+      newsRes.json(),
+      webRes.json()
+    ])
+
+    handleApiKeySuccess(apiKey.id)
+    
+    return {
+      blog: blogData.total || 0,
+      cafe: cafeData.total || 0,
+      news: newsData.total || 0,
+      web: webData.total || 0
+    }
+  } catch (error) {
+    handleApiKeyError(apiKey.id, error)
+    throw error
   }
 }
 
