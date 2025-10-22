@@ -83,7 +83,7 @@ export async function onRequestGet(context) {
           const secretKey = context.env[`SEARCHAD_SECRET_KEY_${firstKey.id}`]
           const customerId = context.env[`SEARCHAD_CUSTOMER_ID_${firstKey.id}`]
           
-          const message = `${timestamp}.${method}.${fullUri}`
+          const message = `${timestamp}.${method}.${uri}`
           const encoder = new TextEncoder()
           const key = await crypto.subtle.importKey(
             'raw',

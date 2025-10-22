@@ -46,8 +46,8 @@ export async function onRequestPost(context) {
     })
     const fullUri = `${uri}?${queryParams.toString()}`
     
-    // HMAC-SHA256 시그니처 생성
-    const message = `${timestamp}.${method}.${fullUri}`
+    // HMAC-SHA256 시그니처 생성 (URI만 사용, 쿼리 파라미터 제외)
+    const message = `${timestamp}.${method}.${uri}`
     const encoder = new TextEncoder()
     const key = await crypto.subtle.importKey(
       'raw',
@@ -62,6 +62,10 @@ export async function onRequestPost(context) {
     console.log('Naver SearchAd API 호출 중...')
     console.log('요청 URL:', `https://api.naver.com${fullUri}`)
     console.log('시그니처 메시지:', message)
+    console.log('타임스탬프:', timestamp)
+    console.log('Access License:', apiKey.accessLicense.substring(0, 8) + '...')
+    console.log('Customer ID:', apiKey.customerId)
+    console.log('시그니처:', signatureBase64.substring(0, 20) + '...')
     
     const response = await fetch(`https://api.naver.com${fullUri}`, {
       method: 'GET',
@@ -78,13 +82,35 @@ export async function onRequestPost(context) {
 
     if (!response.ok) {
       console.log('API 호출 실패:', response.status)
+      const errorText = await response.text()
+      console.log('에러 응답 내용:', errorText)
+      
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: 'API 호출 제한에 도달했습니다. 잠시 후 다시 시도해주세요.' }), {
           status: 429,
           headers: { 'Content-Type': 'application/json' }
         })
       }
-      return new Response(JSON.stringify({ error: `SearchAd API 오류: ${response.status}` }), {
+      
+      if (response.status === 403) {
+        return new Response(JSON.stringify({ 
+          error: `SearchAd API 인증 오류 (403): ${errorText}`,
+          details: {
+            timestamp,
+            message,
+            accessLicense: apiKey.accessLicense.substring(0, 8) + '...',
+            customerId: apiKey.customerId
+          }
+        }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      
+      return new Response(JSON.stringify({ 
+        error: `SearchAd API 오류: ${response.status}`,
+        details: errorText
+      }), {
         status: response.status,
         headers: { 'Content-Type': 'application/json' }
       })
