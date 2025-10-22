@@ -50,6 +50,11 @@ export default function DataPage() {
   // 문서수 자동 수집 상태
   const [isUpdatingDocs, setIsUpdatingDocs] = useState(false)
   const [updateProgress, setUpdateProgress] = useState('')
+  
+  // 자동수집 상태
+  const [isAutoCollecting, setIsAutoCollecting] = useState(false)
+  const [autoCollectStatus, setAutoCollectStatus] = useState(null)
+  const [maxKeywords, setMaxKeywords] = useState(10)
 
   const fetchData = async () => {
     setLoading(true)
@@ -210,8 +215,99 @@ export default function DataPage() {
     }
   }
 
+  // 자동수집 상태 확인
+  const checkAutoCollectStatus = async () => {
+    try {
+      const response = await fetch('/api/auto-collect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'status' })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAutoCollectStatus(result)
+        setIsAutoCollecting(result.isRunning || false)
+      }
+    } catch (error) {
+      console.error('자동수집 상태 확인 오류:', error)
+    }
+  }
+
+  // 자동수집 시작
+  const handleStartAutoCollect = async () => {
+    if (maxKeywords < 1 || maxKeywords > 50) {
+      alert('키워드 개수는 1-50개 사이로 입력해주세요.')
+      return
+    }
+
+    setIsAutoCollecting(true)
+    setAutoCollectStatus(null)
+
+    try {
+      const response = await fetch('/api/auto-collect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'start',
+          maxKeywords: maxKeywords
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('자동수집 시작 실패')
+      }
+
+      const result = await response.json()
+      setAutoCollectStatus(result.status)
+      alert(result.message)
+      
+      // 상태 확인 시작
+      const statusInterval = setInterval(async () => {
+        await checkAutoCollectStatus()
+        if (!isAutoCollecting) {
+          clearInterval(statusInterval)
+          await fetchData() // 데이터 새로고침
+        }
+      }, 3000) // 3초마다 확인
+
+    } catch (error) {
+      console.error('자동수집 시작 오류:', error)
+      alert('자동수집 시작 중 오류가 발생했습니다.')
+      setIsAutoCollecting(false)
+    }
+  }
+
+  // 자동수집 중지
+  const handleStopAutoCollect = async () => {
+    try {
+      const response = await fetch('/api/auto-collect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'stop' })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        alert(result.message)
+        setIsAutoCollecting(false)
+        setAutoCollectStatus(null)
+      }
+    } catch (error) {
+      console.error('자동수집 중지 오류:', error)
+      alert('자동수집 중지 중 오류가 발생했습니다.')
+    }
+  }
+
   useEffect(() => {
     fetchData()
+    checkAutoCollectStatus() // 자동수집 상태 확인
   }, [page, pageSize, query, dateFilter, compFilter, sortBy, sortOrder])
 
   const formatNumber = (num: number) => {
@@ -334,6 +430,53 @@ export default function DataPage() {
               <Download className="h-4 w-4" />
               CSV 다운로드
             </button>
+          </div>
+        </div>
+
+        {/* 자동수집 컨트롤 */}
+        <div className="card mb-6 bg-green-50 border-green-200">
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-green-800 font-medium">시드키워드 개수:</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={maxKeywords}
+                onChange={(e) => setMaxKeywords(parseInt(e.target.value) || 10)}
+                disabled={isAutoCollecting}
+                className="input-field w-20 text-center"
+              />
+            </div>
+            
+            {!isAutoCollecting ? (
+              <button
+                onClick={handleStartAutoCollect}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Database className="h-4 w-4" />
+                자동수집 시작
+              </button>
+            ) : (
+              <button
+                onClick={handleStopAutoCollect}
+                className="btn-secondary flex items-center gap-2"
+              >
+                <Database className="h-4 w-4" />
+                자동수집 중지
+              </button>
+            )}
+            
+            {autoCollectStatus && (
+              <div className="text-green-700 text-sm">
+                {autoCollectStatus.message}
+                {autoCollectStatus.isRunning && (
+                  <span className="ml-2">
+                    ({autoCollectStatus.currentKeywordIndex || 0}/{autoCollectStatus.totalKeywords || 0})
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
