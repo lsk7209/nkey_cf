@@ -1,6 +1,4 @@
 // Cloudflare Functions - OpenAPI
-import { callOpenAPI } from '../../lib/naver-api.js'
-
 export async function onRequestPost(context) {
   try {
     const { keyword } = await context.request.json()
@@ -12,9 +10,15 @@ export async function onRequestPost(context) {
       })
     }
 
-    const result = await callOpenAPI(keyword)
+    // 임시 모의 데이터 반환 (실제 API 연동 시 수정)
+    const mockResult = {
+      blog: Math.floor(Math.random() * 50000) + 10000,
+      cafe: Math.floor(Math.random() * 10000) + 2000,
+      news: Math.floor(Math.random() * 2000) + 500,
+      web: Math.floor(Math.random() * 15000) + 5000
+    }
     
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(mockResult), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (error) {

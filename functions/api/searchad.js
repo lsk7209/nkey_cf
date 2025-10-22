@@ -1,6 +1,4 @@
 // Cloudflare Functions - SearchAd API
-import { callSearchAdAPI } from '../../lib/naver-api.js'
-
 export async function onRequestPost(context) {
   try {
     const { keywords } = await context.request.json()
@@ -12,9 +10,19 @@ export async function onRequestPost(context) {
       })
     }
 
-    const result = await callSearchAdAPI(keywords)
+    // 임시 모의 데이터 반환 (실제 API 연동 시 수정)
+    const mockResult = {
+      keywordList: keywords.map(keyword => ({
+        relKeyword: `${keyword} 관련키워드`,
+        monthlyPcQcCnt: Math.floor(Math.random() * 5000) + 1000,
+        monthlyMobileQcCnt: Math.floor(Math.random() * 10000) + 5000,
+        plAvgCpc: Math.random() * 5 + 1,
+        moAvgCpc: Math.random() * 5 + 2,
+        competition: ['HIGH', 'MEDIUM', 'LOW'][Math.floor(Math.random() * 3)]
+      }))
+    }
     
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(mockResult), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (error) {
