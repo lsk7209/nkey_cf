@@ -58,8 +58,8 @@ export async function onRequestPost(context) {
         let totalDocs = item.total_docs || 0
         let potentialScore = item.potential_score || 0
 
-        // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출 (일시적으로 비활성화)
-        if (false && autoUpdateDocuments && item.rel_keyword) {
+        // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출
+        if (autoUpdateDocuments && item.rel_keyword) {
           try {
             console.log(`문서수 정보 수집 중: ${item.rel_keyword}`)
             
@@ -120,7 +120,10 @@ export async function onRequestPost(context) {
         const storageKey = `data:${dateBucket}:${keyword}:${item.rel_keyword}`
         
         try {
-          await context.env.KEYWORDS_KV.put(storageKey, JSON.stringify(record))
+          // Cloudflare KV 문서에 따른 저장 방법
+          await context.env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
+            expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
+          })
           savedCount++
           console.log(`저장 완료: ${storageKey}`)
         } catch (saveError) {

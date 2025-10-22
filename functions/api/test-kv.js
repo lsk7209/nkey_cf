@@ -27,7 +27,7 @@ export async function onRequestGet(context) {
       })
     }
     
-    // 테스트 데이터 저장
+    // 테스트 데이터 저장 (Cloudflare 문서에 따른 방법)
     const testKey = 'test:kv:storage'
     const testData = {
       message: 'KV 스토리지 테스트',
@@ -36,7 +36,9 @@ export async function onRequestGet(context) {
     }
     
     console.log('테스트 데이터 저장 중...')
-    await context.env.KEYWORDS_KV.put(testKey, JSON.stringify(testData))
+    await context.env.KEYWORDS_KV.put(testKey, JSON.stringify(testData), {
+      expirationTtl: 60 * 60 // 1시간 후 만료
+    })
     console.log('테스트 데이터 저장 완료')
     
     // 테스트 데이터 읽기

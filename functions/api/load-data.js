@@ -37,10 +37,13 @@ export async function onRequestGet(context) {
 
     console.log('파라미터:', { page, pageSize })
 
-    // KV에서 키 목록 조회 (최소한만)
+    // KV에서 키 목록 조회 (Cloudflare 문서에 따른 방법)
     try {
       console.log('키 목록 조회 시작...')
-      const result = await context.env.KEYWORDS_KV.list({ prefix: 'data:' })
+      const result = await context.env.KEYWORDS_KV.list({ 
+        prefix: 'data:',
+        limit: 100 // 최대 100개 키만 조회
+      })
       const keys = result.keys || []
       console.log('총 키 개수:', keys.length)
       
