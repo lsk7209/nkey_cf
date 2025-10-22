@@ -16,6 +16,9 @@ interface DebugInfo {
     licenseLength: number
     secretLength: number
     customerLength: number
+    licensePreview: string
+    secretPreview: string
+    customerPreview: string
   }>
   openApiKeys: Array<{
     id: number
@@ -23,7 +26,25 @@ interface DebugInfo {
     hasClientSecret: boolean
     clientIdLength: number
     clientSecretLength: number
+    clientIdPreview: string
+    clientSecretPreview: string
   }>
+  apiTestResults: {
+    searchAdTest: {
+      status?: number
+      statusText?: string
+      success: boolean
+      responseText?: string
+      error?: string
+    } | null
+    openApiTest: {
+      status?: number
+      statusText?: string
+      success: boolean
+      responseText?: string
+      error?: string
+    } | null
+  }
   message: string
 }
 
@@ -216,6 +237,21 @@ export default function DebugPage() {
                             Secret: {key.secretLength}자<br/>
                             Customer: {key.customerLength}자
                           </div>
+                          {key.hasLicense && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              License: {key.licensePreview}
+                            </div>
+                          )}
+                          {key.hasSecret && (
+                            <div className="text-xs text-gray-400">
+                              Secret: {key.secretPreview}
+                            </div>
+                          )}
+                          {key.hasCustomer && (
+                            <div className="text-xs text-gray-400">
+                              Customer: {key.customerPreview}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -274,11 +310,100 @@ export default function DebugPage() {
                             Client ID: {key.clientIdLength}자<br/>
                             Client Secret: {key.clientSecretLength}자
                           </div>
+                          {key.hasClientId && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Client ID: {key.clientIdPreview}
+                            </div>
+                          )}
+                          {key.hasClientSecret && (
+                            <div className="text-xs text-gray-400">
+                              Client Secret: {key.clientSecretPreview}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* API 테스트 결과 */}
+            <div className="card">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                API 테스트 결과
+              </h2>
+              
+              {/* SearchAd API 테스트 */}
+              <div className="mb-6">
+                <h3 className="text-md font-medium text-gray-800 mb-2">SearchAd API 테스트</h3>
+                {debugInfo.apiTestResults.searchAdTest ? (
+                  <div className={`p-4 rounded-lg ${debugInfo.apiTestResults.searchAdTest.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center mb-2">
+                      {debugInfo.apiTestResults.searchAdTest.success ? (
+                        <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-500 mr-2" />
+                      )}
+                      <span className={`font-medium ${debugInfo.apiTestResults.searchAdTest.success ? 'text-green-800' : 'text-red-800'}`}>
+                        {debugInfo.apiTestResults.searchAdTest.success ? '성공' : '실패'}
+                      </span>
+                    </div>
+                    {debugInfo.apiTestResults.searchAdTest.status && (
+                      <div className="text-sm text-gray-600 mb-2">
+                        상태: {debugInfo.apiTestResults.searchAdTest.status} {debugInfo.apiTestResults.searchAdTest.statusText}
+                      </div>
+                    )}
+                    {debugInfo.apiTestResults.searchAdTest.error && (
+                      <div className="text-sm text-red-600 mb-2">
+                        오류: {debugInfo.apiTestResults.searchAdTest.error}
+                      </div>
+                    )}
+                    {debugInfo.apiTestResults.searchAdTest.responseText && (
+                      <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded overflow-auto max-h-32">
+                        <pre>{debugInfo.apiTestResults.searchAdTest.responseText}</pre>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-gray-500">테스트되지 않음</div>
+                )}
+              </div>
+
+              {/* OpenAPI 테스트 */}
+              <div>
+                <h3 className="text-md font-medium text-gray-800 mb-2">OpenAPI 테스트</h3>
+                {debugInfo.apiTestResults.openApiTest ? (
+                  <div className={`p-4 rounded-lg ${debugInfo.apiTestResults.openApiTest.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center mb-2">
+                      {debugInfo.apiTestResults.openApiTest.success ? (
+                        <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-500 mr-2" />
+                      )}
+                      <span className={`font-medium ${debugInfo.apiTestResults.openApiTest.success ? 'text-green-800' : 'text-red-800'}`}>
+                        {debugInfo.apiTestResults.openApiTest.success ? '성공' : '실패'}
+                      </span>
+                    </div>
+                    {debugInfo.apiTestResults.openApiTest.status && (
+                      <div className="text-sm text-gray-600 mb-2">
+                        상태: {debugInfo.apiTestResults.openApiTest.status} {debugInfo.apiTestResults.openApiTest.statusText}
+                      </div>
+                    )}
+                    {debugInfo.apiTestResults.openApiTest.error && (
+                      <div className="text-sm text-red-600 mb-2">
+                        오류: {debugInfo.apiTestResults.openApiTest.error}
+                      </div>
+                    )}
+                    {debugInfo.apiTestResults.openApiTest.responseText && (
+                      <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded overflow-auto max-h-32">
+                        <pre>{debugInfo.apiTestResults.openApiTest.responseText}</pre>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-gray-500">테스트되지 않음</div>
+                )}
               </div>
             </div>
 
