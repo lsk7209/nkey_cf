@@ -2,5 +2,11 @@ name = "nkey-cf"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "out"
 
+# KV 바인딩
+[[kv_namespaces]]
+binding = "KEYWORDS_KV"
+id = "your-kv-namespace-id"
+preview_id = "your-kv-preview-namespace-id"
+
 [env.production]
 vars = { ENVIRONMENT = "production" }

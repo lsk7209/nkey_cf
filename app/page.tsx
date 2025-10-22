@@ -7,6 +7,7 @@ interface KeywordData {
   rel_keyword: string
   pc_search: number
   mobile_search: number
+  total_search: number
   ctr_pc: number
   ctr_mo: number
   ad_count: number
@@ -17,6 +18,7 @@ interface KeywordData {
   web_count: number
   total_docs: number
   potential_score: number
+  seed_usage: string
   source: 'fresh' | 'cache' | 'cooldown' | 'error'
 }
 
@@ -114,6 +116,7 @@ export default function Home() {
               rel_keyword: item.relKeyword || '',
               pc_search: pcSearch,
               mobile_search: mobileSearch,
+              total_search: pcSearch + mobileSearch,
               ctr_pc: parseFloat(item.monthlyAvePcCtr?.toString() || '0'),
               ctr_mo: parseFloat(item.monthlyAveMobileCtr?.toString() || '0'),
               ad_count: parseInt(item.plAvgDepth || '0'),
@@ -124,6 +127,7 @@ export default function Home() {
               web_count: openApiData.web,
               total_docs: totalDocs,
               potential_score: potentialScore,
+              seed_usage: 'N/A', // 시드활용 필드 추가
               source: 'fresh' as const
             }
           }) || []
@@ -132,6 +136,27 @@ export default function Home() {
             keyword,
             related: normalizedData
           })
+
+          // 데이터 자동 저장
+          try {
+            const saveResponse = await fetch('/api/save-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                keyword,
+                related: normalizedData
+              })
+            })
+            
+            if (saveResponse.ok) {
+              const saveResult = await saveResponse.json()
+              console.log(`데이터 저장 완료 (${keyword}):`, saveResult)
+            } else {
+              console.error(`데이터 저장 실패 (${keyword}):`, saveResponse.status)
+            }
+          } catch (saveError) {
+            console.error(`데이터 저장 오류 (${keyword}):`, saveError)
+          }
         } catch (error) {
           console.error(`Error processing keyword ${keyword}:`, error)
           // 에러가 발생해도 다른 키워드는 계속 처리
@@ -141,6 +166,7 @@ export default function Home() {
               rel_keyword: `${keyword} (오류 발생)`,
               pc_search: 0,
               mobile_search: 0,
+              total_search: 0,
               ctr_pc: 0,
               ctr_mo: 0,
               ad_count: 0,
@@ -151,6 +177,7 @@ export default function Home() {
               web_count: 0,
               total_docs: 0,
               potential_score: 0,
+              seed_usage: 'N/A',
               source: 'error' as const
             }]
           })
@@ -282,22 +309,40 @@ export default function Home() {
                           관련키워드
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          검색량
+                          PC 검색량
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          CTR
+                          모바일 검색량
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          총 검색량
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          카페문서수
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          블로그문서수
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          웹문서수
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          뉴스문서수
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          PC CTR
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          모바일 CTR
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           광고수
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          문서수
+                          경쟁지수
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          경쟁도
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          잠재지수
+                          시드활용
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           상태
@@ -311,30 +356,34 @@ export default function Home() {
                             {item.rel_keyword}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div>
-                              <div>PC: {formatNumber(item.pc_search)}</div>
-                              <div className="text-gray-500">모바일: {formatNumber(item.mobile_search)}</div>
-                            </div>
+                            {formatNumber(item.pc_search)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div>
-                              <div>PC: {item.ctr_pc}%</div>
-                              <div className="text-gray-500">모바일: {item.ctr_mo}%</div>
-                            </div>
+                            {formatNumber(item.mobile_search)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(item.total_search)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(item.cafe_count)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(item.blog_count)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(item.web_count)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(item.news_count)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.ctr_pc}%
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.ctr_mo}%
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                             {item.ad_count}개
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div>
-                              <div>블로그: {formatNumber(item.blog_count)}</div>
-                              <div>카페: {formatNumber(item.cafe_count)}</div>
-                              <div>뉴스: {formatNumber(item.news_count)}</div>
-                              <div>웹: {formatNumber(item.web_count)}</div>
-                              <div className="font-medium text-primary-600">
-                                총: {formatNumber(item.total_docs)}
-                              </div>
-                            </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                             <span className={`px-2 py-1 rounded-full text-xs ${
@@ -346,9 +395,7 @@ export default function Home() {
                             </span>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <span className="font-medium text-primary-600">
-                              {item.potential_score.toFixed(1)}
-                            </span>
+                            {item.seed_usage}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                             {getSourceBadge(item.source)}

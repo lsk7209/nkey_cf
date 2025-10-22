@@ -10,16 +10,16 @@ interface KeywordRecord {
   rel_keyword: string
   pc_search: number
   mobile_search: number
+  total_search: number
+  cafe_count: number
+  blog_count: number
+  web_count: number
+  news_count: number
   ctr_pc: number
   ctr_mo: number
   ad_count: number
   comp_idx: string
-  blog_count: number
-  cafe_count: number
-  news_count: number
-  web_count: number
-  total_docs: number
-  potential_score: number
+  seed_usage: string
   fetched_at: string
 }
 
@@ -58,51 +58,20 @@ export default function DataPage() {
         ...(compFilter !== 'all' && { compFilter }),
       })
 
-      // 임시 모의 데이터 (실제 API 연동 시 수정 필요)
-      const mockData: KeywordRecord[] = [
-        {
-          id: 1,
-          date_bucket: '2024-01-15',
-          keyword: '풀빌라',
-          rel_keyword: '강원도풀빌라',
-          pc_search: 1890,
-          mobile_search: 9280,
-          ctr_pc: 2.86,
-          ctr_mo: 4.45,
-          ad_count: 15,
-          comp_idx: '높음',
-          blog_count: 43120,
-          cafe_count: 5120,
-          news_count: 830,
-          web_count: 9410,
-          total_docs: 58480,
-          potential_score: 19.1,
-          fetched_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: 2,
-          date_bucket: '2024-01-15',
-          keyword: '풀빌라',
-          rel_keyword: '제주도풀빌라',
-          pc_search: 1200,
-          mobile_search: 5600,
-          ctr_pc: 3.2,
-          ctr_mo: 4.8,
-          ad_count: 8,
-          comp_idx: '중간',
-          blog_count: 28000,
-          cafe_count: 3200,
-          news_count: 450,
-          web_count: 5200,
-          total_docs: 36850,
-          potential_score: 18.5,
-          fetched_at: '2024-01-15T10:30:00Z'
-        }
-      ]
+      console.log('데이터 불러오기 요청:', params.toString())
       
-      setData(mockData)
-      setTotal(mockData.length)
-      setTotalPages(1)
+      const response = await fetch(`/api/load-data?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`데이터 불러오기 실패: ${response.status}`)
+      }
+      
+      const result: DataResponse = await response.json()
+      console.log('데이터 불러오기 결과:', result)
+      
+      setData(result.items)
+      setTotal(result.total)
+      setTotalPages(result.totalPages)
     } catch (error) {
       console.error('Error fetching data:', error)
       // 에러 시 빈 데이터 표시
@@ -118,44 +87,40 @@ export default function DataPage() {
     try {
       // CSV 헤더
       const headers = [
-        '수집일',
         '키워드',
-        '관련키워드',
-        'PC검색량',
-        '모바일검색량',
-        'PC_CTR',
-        '모바일_CTR',
+        'PC 검색량',
+        '모바일 검색량',
+        '총 검색량',
+        '카페문서수',
+        '블로그문서수',
+        '웹문서수',
+        '뉴스문서수',
+        'PC CTR',
+        '모바일 CTR',
         '광고수',
-        '경쟁도',
-        '블로그수',
-        '카페수',
-        '뉴스수',
-        '웹수',
-        '총문서수',
-        '잠재지수',
-        '수집시간'
+        '경쟁지수',
+        '시드활용',
+        '수집일시'
       ]
 
       // 데이터를 CSV 형식으로 변환
       const csvRows = [
         headers.join(','),
         ...data.map(item => [
-          item.date_bucket,
-          item.keyword,
           item.rel_keyword,
           item.pc_search,
           item.mobile_search,
+          item.total_search || (item.pc_search + item.mobile_search),
+          item.cafe_count,
+          item.blog_count,
+          item.web_count,
+          item.news_count,
           item.ctr_pc,
           item.ctr_mo,
           item.ad_count,
           item.comp_idx,
-          item.blog_count,
-          item.cafe_count,
-          item.news_count,
-          item.web_count,
-          item.total_docs,
-          item.potential_score,
-          item.fetched_at
+          item.seed_usage || 'N/A',
+          new Date(item.fetched_at).toLocaleString('ko-KR')
         ].join(','))
       ]
 
@@ -339,68 +304,84 @@ export default function DataPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        수집일
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         키워드
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        검색량
+                        PC 검색량
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        CTR
+                        모바일 검색량
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        총 검색량
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        카페문서수
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        블로그문서수
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        웹문서수
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        뉴스문서수
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        PC CTR
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        모바일 CTR
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         광고수
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        문서수
+                        경쟁지수
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        경쟁도
+                        시드활용
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        잠재지수
+                        수집일시
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {data.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {new Date(item.fetched_at).toLocaleDateString('ko-KR')}
-                        </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <div>
-                            <div className="font-medium">{item.keyword}</div>
-                            <div className="text-gray-500">{item.rel_keyword}</div>
-                          </div>
+                          {item.rel_keyword}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>
-                            <div>PC: {formatNumber(item.pc_search)}</div>
-                            <div className="text-gray-500">모바일: {formatNumber(item.mobile_search)}</div>
-                          </div>
+                          {formatNumber(item.pc_search)}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>
-                            <div>PC: {item.ctr_pc}%</div>
-                            <div className="text-gray-500">모바일: {item.ctr_mo}%</div>
-                          </div>
+                          {formatNumber(item.mobile_search)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatNumber(item.total_search || (item.pc_search + item.mobile_search))}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatNumber(item.cafe_count)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatNumber(item.blog_count)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatNumber(item.web_count)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatNumber(item.news_count)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {item.ctr_pc}%
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {item.ctr_mo}%
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {item.ad_count}개
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>
-                            <div>블로그: {formatNumber(item.blog_count)}</div>
-                            <div>카페: {formatNumber(item.cafe_count)}</div>
-                            <div>뉴스: {formatNumber(item.news_count)}</div>
-                            <div>웹: {formatNumber(item.web_count)}</div>
-                            <div className="font-medium text-primary-600">
-                              총: {formatNumber(item.total_docs)}
-                            </div>
-                          </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span className={`px-2 py-1 rounded-full text-xs ${
@@ -412,9 +393,10 @@ export default function DataPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className="font-medium text-primary-600">
-                            {item.potential_score.toFixed(1)}
-                          </span>
+                          {item.seed_usage || 'N/A'}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(item.fetched_at).toLocaleString('ko-KR')}
                         </td>
                       </tr>
                     ))}
