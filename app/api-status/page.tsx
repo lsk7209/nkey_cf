@@ -31,14 +31,24 @@ export default function ApiStatusPage() {
   const fetchKeyStatus = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/test-keys')
       
-      if (!response.ok) {
-        throw new Error('API 키 상태를 불러올 수 없습니다.')
+      // 임시 모의 데이터 (실제 API 연동 시 수정)
+      const mockData = {
+        searchAdKeys: [
+          { id: 1, hasLicense: true, hasSecret: true, hasCustomer: true },
+          { id: 2, hasLicense: true, hasSecret: true, hasCustomer: true },
+          { id: 3, hasLicense: false, hasSecret: true, hasCustomer: true }
+        ],
+        openApiKeys: [
+          { id: 1, hasClientId: true, hasClientSecret: true },
+          { id: 2, hasClientId: true, hasClientSecret: true },
+          { id: 3, hasClientId: false, hasClientSecret: true }
+        ],
+        totalSearchAdKeys: 2,
+        totalOpenApiKeys: 2
       }
       
-      const data = await response.json()
-      setKeyStatus(data)
+      setKeyStatus(mockData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'API 키 상태 확인 중 오류가 발생했습니다.')
     } finally {
