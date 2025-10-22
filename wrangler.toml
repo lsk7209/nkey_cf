@@ -5,8 +5,8 @@ pages_build_output_dir = "out"
 # KV 바인딩
 [[kv_namespaces]]
 binding = "KEYWORDS_KV"
-id = "your-kv-namespace-id"
-preview_id = "your-kv-preview-namespace-id"
+id = "3b91498eb19f49b6a7355aab2c6cabf8"
+preview_id = "3b91498eb19f49b6a7355aab2c6cabf8"
 
 [env.production]
 vars = { ENVIRONMENT = "production" }
