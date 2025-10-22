@@ -38,12 +38,14 @@ export async function onRequestGet(context) {
 
     console.log('KV 스토리지 사용 가능 - 데이터 조회 시작');
     
-    // 간단한 파라미터만 처리
+    // 파라미터 처리
     const url = new URL(context.request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
+    const sortBy = url.searchParams.get('sortBy') || 'cafe_count';
+    const sortOrder = url.searchParams.get('sortOrder') || 'asc';
 
-    console.log('파라미터:', { page, pageSize });
+    console.log('파라미터:', { page, pageSize, sortBy, sortOrder });
 
     // KV에서 키 목록 조회
     try {
@@ -62,8 +64,8 @@ export async function onRequestGet(context) {
       console.log('총 키 개수:', keys.length);
       console.log('조회된 키들:', keys.map(k => k.name));
       
-      // 최대 10개만 처리
-      const maxKeys = Math.min(keys.length, 10);
+      // 모든 키 처리 (최대 100개)
+      const maxKeys = Math.min(keys.length, 100);
       const allData = [];
       
       for (let i = 0; i < maxKeys; i++) {
@@ -83,6 +85,24 @@ export async function onRequestGet(context) {
           console.error(`데이터 로드 오류 (${key.name}):`, error);
         }
       }
+
+      // 복합 정렬 처리 (카페문서수 오름차순 + 총검색량 내림차순)
+      console.log(`정렬 적용: ${sortBy} ${sortOrder}`);
+      allData.sort((a, b) => {
+        // 1순위: 카페문서수 오름차순
+        let aCafeCount = a.cafe_count || 0;
+        let bCafeCount = b.cafe_count || 0;
+        
+        if (aCafeCount !== bCafeCount) {
+          return aCafeCount - bCafeCount; // 오름차순
+        }
+        
+        // 2순위: 총검색량 내림차순
+        let aTotalSearch = (a.pc_search || 0) + (a.mobile_search || 0);
+        let bTotalSearch = (b.pc_search || 0) + (b.mobile_search || 0);
+        
+        return bTotalSearch - aTotalSearch; // 내림차순
+      });
 
       // 페이지네이션
       const total = allData.length;

@@ -44,8 +44,8 @@ export default function DataPage() {
   const [query, setQuery] = useState('')
   const [dateFilter, setDateFilter] = useState('all')
   const [compFilter, setCompFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('fetched_at')
-  const [sortOrder, setSortOrder] = useState('desc')
+  const [sortBy, setSortBy] = useState('cafe_count')
+  const [sortOrder, setSortOrder] = useState('asc')
   
   // 문서수 자동 수집 상태
   const [isUpdatingDocs, setIsUpdatingDocs] = useState(false)
@@ -307,12 +307,14 @@ export default function DataPage() {
                 }}
                 className="input-field"
               >
-                <option value="fetched_at-desc">최신순</option>
-                <option value="fetched_at-asc">오래된순</option>
+                <option value="cafe_count-asc">카페문서수 낮은순 (기본)</option>
+                <option value="cafe_count-desc">카페문서수 높은순</option>
+                <option value="total_search-desc">총검색량 높은순</option>
+                <option value="total_search-asc">총검색량 낮은순</option>
                 <option value="potential_score-desc">잠재지수 높은순</option>
                 <option value="potential_score-asc">잠재지수 낮은순</option>
-                <option value="pc_search-desc">검색량 높은순</option>
-                <option value="pc_search-asc">검색량 낮은순</option>
+                <option value="fetched_at-desc">최신순</option>
+                <option value="fetched_at-asc">오래된순</option>
               </select>
             </div>
             
