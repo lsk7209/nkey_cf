@@ -574,12 +574,25 @@ export async function onRequestPost(context) {
           }
           
           // Cloudflare KV 문서에 따른 저장 방법 (덮어쓰기)
+          console.log(`KV 저장 시도: ${storageKey}`);
+          console.log(`저장할 데이터:`, JSON.stringify(record, null, 2));
+          
           const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
             expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
           });
           
-          savedCount++;
-          console.log(`${shouldUpdate ? '업데이트' : '신규 저장'} 완료 (${savedCount}/${maxItems}): ${rel}`);
+          console.log(`KV 저장 결과:`, putResult);
+          
+          // 저장 후 검증
+          const verifyData = await env.KEYWORDS_KV.get(storageKey);
+          if (verifyData) {
+            console.log(`저장 검증 성공: ${storageKey}`);
+            savedCount++;
+            console.log(`${shouldUpdate ? '업데이트' : '신규 저장'} 완료 (${savedCount}/${maxItems}): ${rel}`);
+          } else {
+            console.error(`저장 검증 실패: ${storageKey} - 데이터가 저장되지 않음`);
+            errorCount++;
+          }
         } catch (saveError) {
           errorCount++;
           console.error(`KV 저장 오류 (${storageKey}):`, saveError.message);
