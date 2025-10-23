@@ -19,14 +19,58 @@ export async function onRequestGet(context) {
       }
     };
 
-    // KV 스토리지가 없으면 빈 응답 반환
+    // KV 스토리지가 없으면 모의 데이터 반환 (개발 환경용)
     if (!kvAvailable) {
-      console.log('KEYWORDS_KV가 설정되지 않음 - 빈 응답 반환');
+      console.log('KEYWORDS_KV가 설정되지 않음 - 모의 데이터 반환');
+      
+      // 모의 데이터 생성
+      const mockData = Array.from({ length: 50 }, (_, i) => ({
+        id: i + 1,
+        date_bucket: '2024-01-15',
+        keyword: `테스트키워드${i + 1}`,
+        rel_keyword: `테스트키워드${i + 1}`,
+        pc_search: Math.floor(Math.random() * 10000) + 1000,
+        mobile_search: Math.floor(Math.random() * 20000) + 5000,
+        total_search: 0,
+        cafe_count: Math.floor(Math.random() * 1000) + 100,
+        blog_count: Math.floor(Math.random() * 2000) + 500,
+        web_count: Math.floor(Math.random() * 5000) + 1000,
+        news_count: Math.floor(Math.random() * 100) + 10,
+        total_docs: 0,
+        potential_score: 0,
+        ctr_pc: Math.random() * 5 + 1,
+        ctr_mo: Math.random() * 5 + 2,
+        ad_count: Math.floor(Math.random() * 50) + 5,
+        comp_idx: ['높음', '중간', '낮음'][Math.floor(Math.random() * 3)],
+        seed_usage: 'N/A',
+        fetched_at: new Date().toISOString(),
+        source: 'mock'
+      }));
+
+      // 계산된 값들 설정
+      mockData.forEach(item => {
+        item.total_search = item.pc_search + item.mobile_search;
+        item.total_docs = item.cafe_count + item.blog_count + item.web_count + item.news_count;
+        item.potential_score = item.total_docs > 0 ? ((item.pc_search + item.mobile_search) / item.total_docs) * 100 : 0;
+      });
+
+      const total = mockData.length;
+      const totalPages = Math.ceil(total / pageSize);
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedData = mockData.slice(startIndex, endIndex);
+
       return new Response(JSON.stringify({
-        ...defaultResponse,
+        total,
+        items: paginatedData,
+        page,
+        pageSize,
+        totalPages,
         debug: {
-          ...defaultResponse.debug,
-          reason: "KEYWORDS_KV not bound"
+          kvAvailable: false,
+          reason: "KEYWORDS_KV not bound - using mock data",
+          mockDataCount: mockData.length,
+          timestamp: new Date().toISOString()
         }
       }), {
         headers: { 
@@ -35,6 +79,12 @@ export async function onRequestGet(context) {
         }
       });
     }
+
+    console.log('KV 바인딩 확인됨:', {
+      exists: !!env.KEYWORDS_KV,
+      type: typeof env.KEYWORDS_KV,
+      methods: env.KEYWORDS_KV ? Object.getOwnPropertyNames(Object.getPrototypeOf(env.KEYWORDS_KV)) : []
+    });
 
     console.log('KV 스토리지 사용 가능 - 데이터 조회 시작');
     

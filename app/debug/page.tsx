@@ -91,26 +91,26 @@ export default function DebugPage() {
               <div className="flex items-center gap-3 mb-4">
                 <Database className="h-6 w-6 text-blue-600" />
                 <h2 className="text-xl font-semibold">KV 스토리지 상태</h2>
-              </div>
-              
+            </div>
+
               {debugInfo.kvStatus ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-500" />
                     <span className="text-green-700">KV 스토리지 연결됨</span>
-                  </div>
+                </div>
                   <div className="text-sm text-gray-600">
                     <p>사용 가능: {debugInfo.kvStatus.available ? '예' : '아니오'}</p>
                     <p>타입: {debugInfo.kvStatus.type}</p>
                     <p>메서드: {debugInfo.kvStatus.methods?.length || 0}개</p>
-                  </div>
                 </div>
+              </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <XCircle className="h-5 w-5 text-red-500" />
                   <span className="text-red-700">KV 스토리지 연결 실패</span>
-                </div>
-              )}
+                            </div>
+                          )}
             </div>
 
             {/* API 키 상태 */}
@@ -118,25 +118,25 @@ export default function DebugPage() {
               <div className="flex items-center gap-3 mb-4">
                 <AlertCircle className="h-6 w-6 text-yellow-600" />
                 <h2 className="text-xl font-semibold">API 키 상태</h2>
-              </div>
-              
+            </div>
+
               {debugInfo.apiStatus ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-500" />
                     <span className="text-green-700">API 키 설정됨</span>
-                  </div>
+                    </div>
                   <div className="text-sm text-gray-600">
                     <p>SearchAd 키: {debugInfo.apiStatus.searchadKeys ? '설정됨' : '없음'}</p>
                     <p>OpenAPI 키: {debugInfo.apiStatus.openapiKeys ? '설정됨' : '없음'}</p>
+                      </div>
                   </div>
-                </div>
-              ) : (
+                ) : (
                 <div className="flex items-center gap-2">
                   <XCircle className="h-5 w-5 text-red-500" />
                   <span className="text-red-700">API 키 확인 실패</span>
-                </div>
-              )}
+                      </div>
+                    )}
             </div>
 
             {/* 데이터 상태 */}
@@ -145,23 +145,23 @@ export default function DebugPage() {
                 <Database className="h-6 w-6 text-purple-600" />
                 <h2 className="text-xl font-semibold">데이터 상태</h2>
               </div>
-              
+
               {debugInfo.error ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-5 w-5 text-red-500" />
                     <span className="text-red-700">데이터 로드 실패</span>
-                  </div>
+                      </div>
                   <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
                     {debugInfo.error}
-                  </div>
-                </div>
+                      </div>
+                    </div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-500" />
                     <span className="text-green-700">데이터 로드 성공</span>
-                  </div>
+                      </div>
                   <div className="text-sm text-gray-600">
                     <p>총 키워드 수: {debugInfo.dataCount.toLocaleString()}개</p>
                   </div>
@@ -177,10 +177,10 @@ export default function DebugPage() {
               >
                 새로고침
               </button>
-            </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
     </div>
   )
 }
