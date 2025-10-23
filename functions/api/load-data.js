@@ -114,16 +114,16 @@ export async function onRequestGet(context) {
         methods: env.KEYWORDS_KV ? Object.getOwnPropertyNames(Object.getPrototypeOf(env.KEYWORDS_KV)) : []
       });
       
-      const result = await env.KEYWORDS_KV.list({ 
-        prefix: 'data:',
-        limit: 10000 // 최대 10000개 키까지 조회 가능
-      });
+             const result = await env.KEYWORDS_KV.list({
+               prefix: 'data:',
+               limit: 1000 // Cloudflare KV 최대 제한
+             });
       const keys = result.keys || [];
       console.log('총 키 개수:', keys.length);
       console.log('조회된 키들:', keys.map(k => k.name));
       
-      // 대용량 배치 처리로 성능 극대화 (최대 10000개)
-      const maxKeys = Math.min(keys.length, 10000);
+      // 대용량 배치 처리로 성능 극대화 (최대 1000개)
+      const maxKeys = Math.min(keys.length, 1000);
       const allData = [];
       const BATCH_SIZE = 25; // 25개씩 대용량 배치 처리
       
