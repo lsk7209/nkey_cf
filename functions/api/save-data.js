@@ -588,6 +588,11 @@ export async function onRequestPost(context) {
             };
             console.log(`테스트 데이터:`, JSON.stringify(testData));
             
+            // KV 저장 전 상태 확인
+            console.log(`KV 저장 전 상태 확인: ${storageKey}`);
+            const beforeData = await env.KEYWORDS_KV.get(storageKey);
+            console.log(`저장 전 데이터:`, beforeData);
+            
             const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(testData));
             console.log(`KV 저장 결과:`, putResult);
             
