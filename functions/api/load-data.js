@@ -102,8 +102,9 @@ export async function onRequestGet(context) {
     const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
     const sortBy = url.searchParams.get('sortBy') || 'cafe_count';
     const sortOrder = url.searchParams.get('sortOrder') || 'asc';
+    const query = url.searchParams.get('query') || '';
 
-    console.log('파라미터:', { page, pageSize, sortBy, sortOrder });
+    console.log('파라미터:', { page, pageSize, sortBy, sortOrder, query });
 
     // KV에서 키 목록 조회
     try {
@@ -155,9 +156,21 @@ export async function onRequestGet(context) {
       
       console.log(`전체 로딩 완료: ${validResults.length}개 데이터 로드됨`);
 
+      // 검색 필터링 적용
+      let filteredData = allData;
+      if (query && query.trim()) {
+        console.log(`검색 쿼리 적용: "${query}"`);
+        const searchTerm = query.toLowerCase().trim();
+        filteredData = allData.filter(item => 
+          (item.keyword && item.keyword.toLowerCase().includes(searchTerm)) ||
+          (item.rel_keyword && item.rel_keyword.toLowerCase().includes(searchTerm))
+        );
+        console.log(`검색 결과: ${filteredData.length}개 (전체 ${allData.length}개 중)`);
+      }
+
       // 복합 정렬 처리 (카페문서수 오름차순 + 총검색량 내림차순)
       console.log(`정렬 적용: ${sortBy} ${sortOrder}`);
-      allData.sort((a, b) => {
+      filteredData.sort((a, b) => {
         // 1순위: 카페문서수 오름차순
         let aCafeCount = a.cafe_count || 0;
         let bCafeCount = b.cafe_count || 0;
@@ -174,11 +187,11 @@ export async function onRequestGet(context) {
       });
 
       // 페이지네이션
-      const total = allData.length;
+      const total = filteredData.length;
       const totalPages = Math.ceil(total / pageSize);
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
-      const paginatedData = allData.slice(startIndex, endIndex);
+      const paginatedData = filteredData.slice(startIndex, endIndex);
 
       console.log('최종 결과:', { total, page, pageSize, totalPages, itemsCount: paginatedData.length });
 
