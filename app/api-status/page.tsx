@@ -32,23 +32,15 @@ export default function ApiStatusPage() {
     try {
       setLoading(true)
       
-      // 임시 모의 데이터 (실제 API 연동 시 수정)
-      const mockData = {
-        searchAdKeys: [
-          { id: 1, hasLicense: true, hasSecret: true, hasCustomer: true },
-          { id: 2, hasLicense: true, hasSecret: true, hasCustomer: true },
-          { id: 3, hasLicense: false, hasSecret: true, hasCustomer: true }
-        ],
-        openApiKeys: [
-          { id: 1, hasClientId: true, hasClientSecret: true },
-          { id: 2, hasClientId: true, hasClientSecret: true },
-          { id: 3, hasClientId: false, hasClientSecret: true }
-        ],
-        totalSearchAdKeys: 2,
-        totalOpenApiKeys: 2
+      // 실제 API 키 상태 확인
+      const response = await fetch('/api/test-keys')
+      
+      if (!response.ok) {
+        throw new Error(`API 키 상태 확인 실패: ${response.status}`)
       }
       
-      setKeyStatus(mockData)
+      const data = await response.json()
+      setKeyStatus(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'API 키 상태 확인 중 오류가 발생했습니다.')
     } finally {
@@ -88,6 +80,9 @@ export default function ApiStatusPage() {
               </a>
               <a href="/data" className="text-gray-600 hover:text-gray-900">
                 데이터
+              </a>
+              <a href="/analytics" className="text-gray-600 hover:text-gray-900">
+                분석
               </a>
             </nav>
           </div>

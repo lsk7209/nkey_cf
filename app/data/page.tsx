@@ -53,7 +53,12 @@ export default function DataPage() {
   
   // 자동수집 상태
   const [isAutoCollecting, setIsAutoCollecting] = useState(false)
-  const [autoCollectStatus, setAutoCollectStatus] = useState(null)
+  const [autoCollectStatus, setAutoCollectStatus] = useState<{
+    message: string
+    isRunning: boolean
+    currentKeywordIndex?: number
+    totalKeywords?: number
+  } | null>(null)
   const [maxKeywords, setMaxKeywords] = useState(10)
 
   const fetchData = async () => {
@@ -387,6 +392,9 @@ export default function DataPage() {
               <a href="/" className="text-gray-600 hover:text-gray-900">
                 홈으로
               </a>
+              <a href="/analytics" className="text-gray-600 hover:text-gray-900">
+                분석
+              </a>
             </nav>
           </div>
         </div>
@@ -541,28 +549,28 @@ export default function DataPage() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-primary-600">{total.toLocaleString()}</div>
-            <div className="text-sm text-gray-500">총 레코드</div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="stat-card">
+            <div className="stat-number text-primary-600">{total.toLocaleString()}</div>
+            <div className="stat-label">총 레코드</div>
           </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-green-600">
+          <div className="stat-card">
+            <div className="stat-number text-green-600">
               {data.filter(d => d.comp_idx === '낮음').length}
             </div>
-            <div className="text-sm text-gray-500">낮은 경쟁도</div>
+            <div className="stat-label">낮은 경쟁도</div>
           </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-yellow-600">
+          <div className="stat-card">
+            <div className="stat-number text-yellow-600">
               {data.filter(d => d.comp_idx === '중간').length}
             </div>
-            <div className="text-sm text-gray-500">중간 경쟁도</div>
+            <div className="stat-label">중간 경쟁도</div>
           </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-red-600">
+          <div className="stat-card">
+            <div className="stat-number text-red-600">
               {data.filter(d => d.comp_idx === '높음').length}
             </div>
-            <div className="text-sm text-gray-500">높은 경쟁도</div>
+            <div className="stat-label">높은 경쟁도</div>
           </div>
         </div>
 
