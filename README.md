@@ -6,15 +6,17 @@
 
 - **키워드 검색**: 최대 5개의 키워드를 동시에 검색
 - **데이터 수집**: 네이버 SearchAd API + OpenAPI 병렬 호출
-- **자동 저장**: 수집 결과를 Cloudflare D1에 자동 저장
+- **자동 저장**: 수집 결과를 Cloudflare KV에 자동 저장
+- **문서수 자동 수집**: 키워드 저장 시 블로그/카페/뉴스/웹 문서수 자동 수집
 - **데이터 관리**: 필터링, 정렬, CSV 다운로드 기능
 - **실시간 분석**: 검색량, CTR, 경쟁도, 문서수, 잠재지수 분석
+- **분석 대시보드**: 키워드 통계 및 트렌드 분석
 
 ## 기술 스택
 
 - **Frontend**: Next.js 14, Tailwind CSS, TypeScript
 - **Backend**: Next.js API Routes (Edge Runtime)
-- **Database**: Cloudflare D1 (SQLite)
+- **Database**: Cloudflare KV (Key-Value Storage)
 - **Cache**: Cloudflare KV
 - **Hosting**: Cloudflare Pages
 - **APIs**: Naver SearchAd API, Naver OpenAPI
@@ -23,20 +25,25 @@
 
 ```
 ├── app/
-│   ├── api/
-│   │   ├── keyword/route.ts      # 키워드 검색 API
-│   │   ├── data/route.ts         # 데이터 조회 API
-│   │   └── data.csv/route.ts     # CSV 다운로드 API
+│   ├── page.tsx                  # 메인 페이지 (키워드 검색)
 │   ├── data/page.tsx             # 데이터 관리 페이지
-│   ├── page.tsx                  # 메인 페이지
-│   ├── layout.tsx                # 레이아웃
-│   └── globals.css               # 글로벌 스타일
-├── lib/
-│   ├── d1-client.ts              # D1 데이터베이스 클라이언트
-│   ├── naver-api.ts              # Naver API 유틸리티
-│   └── utils.ts                  # 공통 유틸리티
-├── migrations/
-│   └── 0001_init.sql            # 데이터베이스 스키마
+│   ├── analytics/page.tsx        # 분석 대시보드
+│   ├── api-status/page.tsx       # API 상태 확인
+│   ├── debug/page.tsx            # 디버그 페이지
+│   ├── components/               # React 컴포넌트
+│   │   ├── KeywordTable.tsx      # 키워드 테이블
+│   │   ├── LoadingSpinner.tsx    # 로딩 스피너
+│   │   └── DataTableSkeleton.tsx # 데이터 테이블 스켈레톤
+│   └── utils/                    # 유틸리티 함수
+│       └── badges.tsx            # 배지 컴포넌트
+├── functions/api/                # Cloudflare Functions
+│   ├── searchad.js              # SearchAd API 호출
+│   ├── save-data.js             # 데이터 저장
+│   ├── load-data.js             # 데이터 로드
+│   ├── update-documents.js      # 문서수 업데이트
+│   ├── auto-collect.js          # 자동 수집
+│   ├── test-keys.js             # API 키 테스트
+│   └── test-data.js             # 데이터 테스트
 ├── wrangler.toml                 # Cloudflare 설정
 └── package.json
 ```
@@ -79,13 +86,10 @@ npm install -g wrangler
 # 로그인
 wrangler login
 
-# D1 데이터베이스 생성
-wrangler d1 create nkey-db
-
 # KV 네임스페이스 생성
-wrangler kv:namespace create "CACHE"
+wrangler kv:namespace create "KEYWORDS_KV"
 
-# wrangler.toml 파일의 database_id와 kv id를 업데이트
+# wrangler.toml 파일의 kv id를 업데이트
 
 # 배포
 wrangler pages deploy
@@ -148,29 +152,35 @@ wrangler pages deploy
 
 CSV 다운로드 (쿼리 파라미터는 /api/data와 동일)
 
-## 데이터베이스 스키마
+## 데이터 구조 (Cloudflare KV)
 
-```sql
-CREATE TABLE keywords (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  date_bucket TEXT NOT NULL,
-  keyword TEXT NOT NULL,
-  rel_keyword TEXT NOT NULL,
-  pc_search INTEGER DEFAULT 0,
-  mobile_search INTEGER DEFAULT 0,
-  ctr_pc REAL DEFAULT 0,
-  ctr_mo REAL DEFAULT 0,
-  ad_count INTEGER DEFAULT 0,
-  comp_idx TEXT,
-  blog_count INTEGER DEFAULT 0,
-  cafe_count INTEGER DEFAULT 0,
-  news_count INTEGER DEFAULT 0,
-  web_count INTEGER DEFAULT 0,
-  total_docs INTEGER DEFAULT 0,
-  potential_score REAL DEFAULT 0,
-  fetched_at TEXT NOT NULL
-);
+키워드 데이터는 Cloudflare KV에 JSON 형태로 저장됩니다:
+
+```json
+{
+  "date_bucket": "2024-01-15",
+  "keyword": "풀빌라",
+  "rel_keyword": "강원도풀빌라",
+  "pc_search": 1890,
+  "mobile_search": 9280,
+  "total_search": 11170,
+  "ctr_pc": 2.86,
+  "ctr_mo": 4.45,
+  "ad_count": 15,
+  "comp_idx": "높음",
+  "blog_count": 43120,
+  "cafe_count": 5120,
+  "news_count": 830,
+  "web_count": 9410,
+  "total_docs": 58480,
+  "potential_score": 19.1,
+  "seed_usage": "풀빌라",
+  "fetched_at": "2024-01-15T10:30:00.000Z",
+  "source": "fresh"
+}
 ```
+
+**키 형식**: `data:YYYY-MM-DD:키워드명`
 
 ## 주요 기능
 
@@ -193,9 +203,16 @@ CREATE TABLE keywords (
 - 페이지네이션: 10/50/100개 선택
 
 ### 4. 캐시 및 성능
-- KV 캐시: 6시간 TTL
+- KV 스토리지: 영구 저장
 - 쿨다운 처리: 429 에러 시 5분 대기
 - 재시도 로직: 300ms → 600ms → 1200ms
+- 배치 처리: 25개씩 병렬 처리로 성능 최적화
+
+### 5. 문서수 자동 수집
+- **자동 수집**: 키워드 저장 시 문서수 자동 수집
+- **병렬 처리**: 블로그/카페/뉴스/웹 문서수 동시 수집
+- **잠재력 점수**: (검색량 / 총문서수) * 100 자동 계산
+- **오류 처리**: API 실패 시 기본값으로 저장 계속 진행
 
 ## 라이선스
 
