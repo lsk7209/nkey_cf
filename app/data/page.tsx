@@ -69,6 +69,32 @@ export default function DataPage() {
     const startTime = Date.now()
     
     try {
+      // 먼저 테스트 API로 KV 상태 확인
+      console.log('KV 상태 테스트 시작...')
+      const testResponse = await fetch('/api/test-data')
+      const testResult = await testResponse.json()
+      console.log('KV 테스트 결과:', testResult)
+      
+      if (!testResult.success) {
+        const errorMessage = `KV 스토리지 문제: ${testResult.message}`
+        console.error(errorMessage)
+        setError(errorMessage)
+        setData([])
+        setTotal(0)
+        setTotalPages(0)
+        return
+      }
+      
+      if (testResult.totalKeys === 0) {
+        const errorMessage = '저장된 데이터가 없습니다. 먼저 키워드를 검색해보세요.'
+        console.log(errorMessage)
+        setError(errorMessage)
+        setData([])
+        setTotal(0)
+        setTotalPages(0)
+        return
+      }
+
       const params = new URLSearchParams({
         page: page.toString(),
         pageSize: pageSize.toString(),
