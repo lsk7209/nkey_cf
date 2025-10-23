@@ -37,8 +37,8 @@ export default function AnalyticsPage() {
     try {
       setLoading(true)
       
-      // 실제 데이터를 가져오는 API 호출
-      const response = await fetch('/api/load-data?page=1&pageSize=1000')
+      // 실제 데이터를 가져오는 API 호출 (모든 데이터)
+      const response = await fetch('/api/load-data?page=1&pageSize=10000')
       
       if (!response.ok) {
         throw new Error(`데이터 불러오기 실패: ${response.status}`)

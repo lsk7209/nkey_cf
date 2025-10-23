@@ -38,7 +38,7 @@ export default function DataPage() {
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(100)
+  const [pageSize, setPageSize] = useState(500)
   const [totalPages, setTotalPages] = useState(0)
   
   // 필터 상태
@@ -737,6 +737,10 @@ export default function DataPage() {
                       <option value={100}>100</option>
                       <option value={200}>200</option>
                       <option value={500}>500</option>
+                      <option value={1000}>1000</option>
+                      <option value={2000}>2000</option>
+                      <option value={5000}>5000</option>
+                      <option value={10000}>전체</option>
                     </select>
                   </div>
                   
