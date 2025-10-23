@@ -577,20 +577,25 @@ export async function onRequestPost(context) {
           console.log(`KV 저장 시도: ${storageKey}`);
           console.log(`저장할 데이터:`, JSON.stringify(record, null, 2));
           
-          const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
-            expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
-          });
-          
-          console.log(`KV 저장 결과:`, putResult);
-          
-          // 저장 후 검증
-          const verifyData = await env.KEYWORDS_KV.get(storageKey);
-          if (verifyData) {
-            console.log(`저장 검증 성공: ${storageKey}`);
-            savedCount++;
-            console.log(`${shouldUpdate ? '업데이트' : '신규 저장'} 완료 (${savedCount}/${maxItems}): ${rel}`);
-          } else {
-            console.error(`저장 검증 실패: ${storageKey} - 데이터가 저장되지 않음`);
+          try {
+            const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
+              expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
+            });
+            
+            console.log(`KV 저장 결과:`, putResult);
+            
+            // 저장 후 검증
+            const verifyData = await env.KEYWORDS_KV.get(storageKey);
+            if (verifyData) {
+              console.log(`저장 검증 성공: ${storageKey}`);
+              savedCount++;
+              console.log(`${shouldUpdate ? '업데이트' : '신규 저장'} 완료 (${savedCount}/${maxItems}): ${rel}`);
+            } else {
+              console.error(`저장 검증 실패: ${storageKey} - 데이터가 저장되지 않음`);
+              errorCount++;
+            }
+          } catch (kvError) {
+            console.error(`KV 저장 중 오류 발생:`, kvError);
             errorCount++;
           }
         } catch (saveError) {
