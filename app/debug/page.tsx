@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
+import { Database, AlertCircle, CheckCircle, XCircle, Play, Square, RefreshCw } from 'lucide-react'
 
 interface DebugInfo {
   kvStatus: any
@@ -10,13 +10,39 @@ interface DebugInfo {
   error?: string | null
 }
 
+interface AutoCollectLog {
+  timestamp: string
+  level: 'info' | 'success' | 'warning' | 'error'
+  message: string
+  details?: any
+}
+
 export default function DebugPage() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [autoCollectLogs, setAutoCollectLogs] = useState<AutoCollectLog[]>([])
+  const [isAutoCollecting, setIsAutoCollecting] = useState(false)
+  const [autoCollectStatus, setAutoCollectStatus] = useState<any>(null)
+  const [logPolling, setLogPolling] = useState(false)
 
   useEffect(() => {
     fetchDebugInfo()
   }, [])
+
+  // 자동수집 상태 폴링
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+    
+    if (logPolling) {
+      interval = setInterval(async () => {
+        await checkAutoCollectStatus()
+      }, 2000) // 2초마다 상태 확인
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [logPolling])
 
   const fetchDebugInfo = async () => {
     try {
@@ -63,8 +89,118 @@ export default function DebugPage() {
     }
   }
 
+  // 자동수집 상태 확인
+  const checkAutoCollectStatus = async () => {
+    try {
+      const response = await fetch('/api/auto-collect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status' })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAutoCollectStatus(result)
+        setIsAutoCollecting(result.isRunning || false)
+
+        // 로그 추가
+        if (result.isRunning) {
+          const log: AutoCollectLog = {
+        timestamp: new Date().toISOString(),
+            level: 'info',
+            message: `자동수집 진행 중: ${result.currentKeywordIndex || 0}/${result.totalKeywords || 0}`,
+            details: result
+          }
+          setAutoCollectLogs(prev => [...prev.slice(-49), log]) // 최대 50개 로그 유지
+        }
+      }
+    } catch (error) {
+      console.error('자동수집 상태 확인 오류:', error)
+    }
+  }
+
+  // 자동수집 시작
+  const startAutoCollect = async () => {
+    try {
+      const response = await fetch('/api/auto-collect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'start', 
+          maxKeywords: 5 
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        const log: AutoCollectLog = {
+            timestamp: new Date().toISOString(),
+          level: 'success',
+          message: `자동수집 시작: ${result.message}`,
+          details: result
+        }
+        setAutoCollectLogs(prev => [...prev.slice(-49), log])
+        setLogPolling(true)
+      } else {
+        const error = await response.text()
+        const log: AutoCollectLog = {
+              timestamp: new Date().toISOString(),
+          level: 'error',
+          message: `자동수집 시작 실패: ${error}`,
+          details: { status: response.status }
+        }
+        setAutoCollectLogs(prev => [...prev.slice(-49), log])
+      }
+    } catch (error) {
+      const log: AutoCollectLog = {
+              timestamp: new Date().toISOString(),
+        level: 'error',
+        message: `자동수집 시작 오류: ${error}`,
+        details: { error: String(error) }
+      }
+      setAutoCollectLogs(prev => [...prev.slice(-49), log])
+    }
+  }
+
+  // 자동수집 중지
+  const stopAutoCollect = async () => {
+    try {
+      const response = await fetch('/api/auto-collect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        const log: AutoCollectLog = {
+              timestamp: new Date().toISOString(),
+          level: 'warning',
+          message: `자동수집 중지: ${result.message}`,
+          details: result
+        }
+        setAutoCollectLogs(prev => [...prev.slice(-49), log])
+        setLogPolling(false)
+        setIsAutoCollecting(false)
+      }
+    } catch (error) {
+      const log: AutoCollectLog = {
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: `자동수집 중지 오류: ${error}`,
+        details: { error: String(error) }
+      }
+      setAutoCollectLogs(prev => [...prev.slice(-49), log])
+    }
+  }
+
+  // 로그 클리어
+  const clearLogs = () => {
+    setAutoCollectLogs([])
+  }
+
   if (loading) {
-    return (
+  return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center py-8">
@@ -167,6 +303,86 @@ export default function DebugPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* 자동수집 로그 섹션 */}
+            <div className="card">
+              <div className="flex items-center gap-3 mb-4">
+                <RefreshCw className="h-6 w-6 text-indigo-600" />
+                <h2 className="text-xl font-semibold">자동수집 로그</h2>
+              </div>
+
+              {/* 자동수집 컨트롤 */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={startAutoCollect}
+                  disabled={isAutoCollecting}
+                  className="btn-success flex items-center gap-2"
+                >
+                  <Play className="h-4 w-4" />
+                  자동수집 시작
+                </button>
+                <button
+                  onClick={stopAutoCollect}
+                  disabled={!isAutoCollecting}
+                  className="btn-danger flex items-center gap-2"
+                >
+                  <Square className="h-4 w-4" />
+                  자동수집 중지
+                </button>
+                <button
+                  onClick={clearLogs}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  로그 클리어
+                </button>
+              </div>
+
+              {/* 자동수집 상태 */}
+              {autoCollectStatus && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm">
+                    <p><strong>상태:</strong> {autoCollectStatus.isRunning ? '실행 중' : '중지됨'}</p>
+                    {autoCollectStatus.isRunning && (
+                      <>
+                        <p><strong>진행률:</strong> {autoCollectStatus.currentKeywordIndex || 0}/{autoCollectStatus.totalKeywords || 0}</p>
+                        <p><strong>현재 키워드:</strong> {autoCollectStatus.currentKeyword || 'N/A'}</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 로그 표시 */}
+              <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+                {autoCollectLogs.length === 0 ? (
+                  <div className="text-gray-500">로그가 없습니다. 자동수집을 시작해보세요.</div>
+                ) : (
+                  autoCollectLogs.map((log, index) => (
+                    <div key={index} className="mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 text-xs">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          log.level === 'success' ? 'bg-green-900 text-green-300' :
+                          log.level === 'warning' ? 'bg-yellow-900 text-yellow-300' :
+                          log.level === 'error' ? 'bg-red-900 text-red-300' :
+                          'bg-blue-900 text-blue-300'
+                        }`}>
+                          {log.level.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="ml-2">{log.message}</div>
+                      {log.details && (
+                        <div className="ml-4 text-xs text-gray-400">
+                          {JSON.stringify(log.details, null, 2)}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             {/* 새로고침 버튼 */}
