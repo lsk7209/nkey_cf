@@ -19,6 +19,14 @@ export async function onRequestGet(context) {
       }
     };
 
+    // KV 바인딩 상태 상세 확인
+    console.log('KV 바인딩 상태:', {
+      kvAvailable,
+      envKeys: Object.keys(env),
+      hasKeywordsKv: !!env.KEYWORDS_KV,
+      kvType: typeof env.KEYWORDS_KV
+    });
+
     // KV 스토리지가 없으면 모의 데이터 반환 (개발 환경용)
     if (!kvAvailable) {
       console.log('KEYWORDS_KV가 설정되지 않음 - 모의 데이터 반환');
