@@ -34,6 +34,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
   const [error, setError] = useState('')
+  const [backgroundMode, setBackgroundMode] = useState(false)
+  const [backgroundCollectionId, setBackgroundCollectionId] = useState('')
 
   const handleSearch = async () => {
     if (!keywords.trim()) {
@@ -146,13 +148,20 @@ export default function Home() {
               body: JSON.stringify({
                 keyword,
                 related: normalizedData,
-                autoUpdateDocuments: true // 문서수 자동 업데이트 플래그
+                autoUpdateDocuments: true, // 문서수 자동 업데이트 플래그
+                backgroundMode: backgroundMode // 백그라운드 모드 플래그
               })
             })
             
             if (saveResponse.ok) {
               const saveResult = await saveResponse.json()
               console.log(`데이터 저장 및 문서수 업데이트 완료 (${keyword}):`, saveResult)
+              
+              // 백그라운드 모드인 경우 수집 ID 저장
+              if (saveResult.backgroundMode && saveResult.collectionId) {
+                setBackgroundCollectionId(saveResult.collectionId)
+                console.log(`백그라운드 수집 시작됨 (${keyword}): ${saveResult.collectionId}`)
+              }
             } else {
               console.error(`데이터 저장 실패 (${keyword}):`, saveResponse.status)
             }
@@ -264,6 +273,32 @@ export default function Home() {
               </button>
             </div>
 
+            {/* 백그라운드 수집 옵션 */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="backgroundMode"
+                    checked={backgroundMode}
+                    onChange={(e) => setBackgroundMode(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="backgroundMode" className="text-sm font-medium text-blue-800">
+                    백그라운드 수집 모드
+                  </label>
+                </div>
+                <div className="text-xs text-blue-600">
+                  페이지를 나가도 수집이 계속됩니다
+                </div>
+              </div>
+              {backgroundMode && (
+                <div className="mt-2 text-xs text-blue-700">
+                  ✓ 백그라운드에서 문서수 정보를 자동으로 수집합니다
+                </div>
+              )}
+            </div>
+
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-2">
                 <XCircle className="h-5 w-5 text-red-500" />
@@ -285,6 +320,22 @@ export default function Home() {
                 <div className="text-sm text-purple-600">저장 및 분석</div>
               </div>
             </div>
+
+            {/* 백그라운드 수집 상태 표시 */}
+            {backgroundCollectionId && (
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-green-800">백그라운드 수집 진행 중</span>
+                </div>
+                <div className="text-xs text-green-700">
+                  수집 ID: {backgroundCollectionId}
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  페이지를 나가셔도 수집이 계속됩니다. 완료된 데이터는 <a href="/data" className="underline">데이터</a> 메뉴에서 확인할 수 있습니다.
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-8 text-center">

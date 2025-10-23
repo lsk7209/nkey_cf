@@ -8,6 +8,8 @@
 - **데이터 수집**: 네이버 SearchAd API + OpenAPI 병렬 호출
 - **자동 저장**: 수집 결과를 Cloudflare KV에 자동 저장
 - **문서수 자동 수집**: 키워드 저장 시 블로그/카페/뉴스/웹 문서수 자동 수집
+- **백그라운드 수집**: 페이지를 나가도 백그라운드에서 수집 계속 진행
+- **중복 키워드 처리**: 30일 경과 시에만 기존 데이터 덮어쓰기
 - **데이터 관리**: 필터링, 정렬, CSV 다운로드 기능
 - **실시간 분석**: 검색량, CTR, 경쟁도, 문서수, 잠재지수 분석
 - **분석 대시보드**: 키워드 통계 및 트렌드 분석
@@ -38,7 +40,8 @@
 │       └── badges.tsx            # 배지 컴포넌트
 ├── functions/api/                # Cloudflare Functions
 │   ├── searchad.js              # SearchAd API 호출
-│   ├── save-data.js             # 데이터 저장
+│   ├── save-data.js             # 데이터 저장 (백그라운드 수집 지원)
+│   ├── background-collect.js    # 백그라운드 수집 전용 API
 │   ├── load-data.js             # 데이터 로드
 │   ├── update-documents.js      # 문서수 업데이트
 │   ├── auto-collect.js          # 자동 수집
@@ -152,6 +155,58 @@ wrangler pages deploy
 
 CSV 다운로드 (쿼리 파라미터는 /api/data와 동일)
 
+### POST /api/save-data (백그라운드 모드)
+
+백그라운드에서 키워드 데이터 수집
+
+**요청:**
+```json
+{
+  "keyword": "풀빌라",
+  "related": [...],
+  "autoUpdateDocuments": true,
+  "backgroundMode": true
+}
+```
+
+**응답:**
+```json
+{
+  "success": true,
+  "backgroundMode": true,
+  "collectionId": "bg_1703123456789_abc123def",
+  "keyword": "풀빌라",
+  "totalCount": 50,
+  "message": "백그라운드 수집이 시작되었습니다. 페이지를 나가셔도 수집이 계속됩니다.",
+  "startTime": "2024-01-15T10:30:00.000Z"
+}
+```
+
+### POST /api/background-collect
+
+백그라운드 수집 전용 API (별도 엔드포인트)
+
+**요청:**
+```json
+{
+  "keyword": "풀빌라",
+  "related": [...],
+  "autoUpdateDocuments": true
+}
+```
+
+**응답:**
+```json
+{
+  "success": true,
+  "backgroundMode": true,
+  "collectionId": "bg_1703123456789_abc123def",
+  "keyword": "풀빌라",
+  "totalCount": 50,
+  "message": "백그라운드 수집이 시작되었습니다. 페이지를 나가셔도 수집이 계속됩니다."
+}
+```
+
 ## 데이터 구조 (Cloudflare KV)
 
 키워드 데이터는 Cloudflare KV에 JSON 형태로 저장됩니다:
@@ -213,6 +268,19 @@ CSV 다운로드 (쿼리 파라미터는 /api/data와 동일)
 - **병렬 처리**: 블로그/카페/뉴스/웹 문서수 동시 수집
 - **잠재력 점수**: (검색량 / 총문서수) * 100 자동 계산
 - **오류 처리**: API 실패 시 기본값으로 저장 계속 진행
+
+### 6. 백그라운드 수집
+- **백그라운드 모드**: 페이지를 나가도 수집이 계속 진행
+- **즉시 응답**: 사용자는 검색 결과를 즉시 확인 가능
+- **문서수 수집**: 백그라운드에서 문서수 정보 자동 수집
+- **수집 상태 추적**: 고유 수집 ID로 진행 상황 모니터링
+- **중복 처리**: 30일 경과 시에만 기존 데이터 덮어쓰기
+
+### 7. 중복 키워드 처리
+- **30일 규칙**: 기존 수집일에서 30일이 지나면 덮어쓰기
+- **데이터 보존**: 30일 미만이면 기존 데이터 건너뛰기
+- **안전장치**: 수집일 정보가 없으면 덮어쓰기
+- **로깅**: 중복 처리 이유와 일수를 상세 로그로 기록
 
 ## 라이선스
 
