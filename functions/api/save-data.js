@@ -581,9 +581,15 @@ export async function onRequestPost(context) {
             console.log(`KV 저장 시작: ${storageKey}`);
             console.log(`저장할 데이터 크기: ${JSON.stringify(record).length} bytes`);
             
-            const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
-              expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
-            });
+            // 단순한 저장 테스트 (expirationTtl 제거, 데이터 크기 제한)
+            const simpleRecord = {
+              keyword: record.keyword,
+              rel_keyword: record.rel_keyword,
+              fetched_at: record.fetched_at,
+              created_at: record.created_at
+            };
+            console.log(`단순화된 데이터:`, JSON.stringify(simpleRecord));
+            const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(simpleRecord));
             
             console.log(`KV 저장 결과:`, putResult);
             
