@@ -91,30 +91,76 @@ export async function onRequestPost(context) {
             if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) {
               console.log('OpenAPI 키가 설정되지 않음 - 문서수 수집 건너뜀');
             } else {
-              // OpenAPI 호출하여 문서수 정보 가져오기 (타임아웃 5초)
               const query = encodeURIComponent(rel);
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
+              const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초로 증가
               
-              const openApiResponse = await fetch(`https://openapi.naver.com/v1/search/blog.json?query=${query}&display=1`, {
-                method: 'GET',
-                headers: {
-                  'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-                  'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
-                },
-                signal: controller.signal
-              });
+              // 모든 문서 타입을 병렬로 수집
+              const [blogResponse, cafeResponse, newsResponse, webResponse] = await Promise.allSettled([
+                fetch(`https://openapi.naver.com/v1/search/blog.json?query=${query}&display=1`, {
+                  method: 'GET',
+                  headers: {
+                    'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+                    'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+                  },
+                  signal: controller.signal
+                }),
+                fetch(`https://openapi.naver.com/v1/search/cafearticle.json?query=${query}&display=1`, {
+                  method: 'GET',
+                  headers: {
+                    'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+                    'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+                  },
+                  signal: controller.signal
+                }),
+                fetch(`https://openapi.naver.com/v1/search/news.json?query=${query}&display=1`, {
+                  method: 'GET',
+                  headers: {
+                    'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+                    'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+                  },
+                  signal: controller.signal
+                }),
+                fetch(`https://openapi.naver.com/v1/search/webkr.json?query=${query}&display=1`, {
+                  method: 'GET',
+                  headers: {
+                    'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+                    'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+                  },
+                  signal: controller.signal
+                })
+              ]);
+              
+              // 블로그 문서수 처리
+              if (blogResponse.status === 'fulfilled' && blogResponse.value.ok) {
+                const blogData = await blogResponse.value.json();
+                blogCount = blogData.total || 0;
+                console.log(`블로그 문서수: ${blogCount}`);
+              }
+              
+              // 카페 문서수 처리
+              if (cafeResponse.status === 'fulfilled' && cafeResponse.value.ok) {
+                const cafeData = await cafeResponse.value.json();
+                cafeCount = cafeData.total || 0;
+                console.log(`카페 문서수: ${cafeCount}`);
+              }
+              
+              // 뉴스 문서수 처리
+              if (newsResponse.status === 'fulfilled' && newsResponse.value.ok) {
+                const newsData = await newsResponse.value.json();
+                newsCount = newsData.total || 0;
+                console.log(`뉴스 문서수: ${newsCount}`);
+              }
+              
+              // 웹 문서수 처리
+              if (webResponse.status === 'fulfilled' && webResponse.value.ok) {
+                const webData = await webResponse.value.json();
+                webCount = webData.total || 0;
+                console.log(`웹 문서수: ${webCount}`);
+              }
               
               clearTimeout(timeoutId);
-              
-              if (openApiResponse.ok) {
-                const openApiData = await openApiResponse.json();
-                blogCount = openApiData.total || 0;
-                console.log(`블로그 문서수 수집 성공: ${rel} - ${blogCount}개`);
-              } else {
-                const errorText = await openApiResponse.text();
-                console.log(`OpenAPI 호출 실패: ${openApiResponse.status} - ${errorText}`);
-              }
+              console.log(`문서수 수집 완료: ${rel} - 총 ${blogCount + cafeCount + newsCount + webCount}개`);
             }
           } catch (docError) {
             console.error(`문서수 수집 오류 (${rel}):`, docError.message);
