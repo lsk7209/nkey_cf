@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Database, Download, Search, Filter, Calendar } from 'lucide-react'
+import DataTableSkeleton from '../components/DataTableSkeleton'
 
 interface KeywordRecord {
   id: number
@@ -37,7 +38,7 @@ export default function DataPage() {
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(100)
   const [totalPages, setTotalPages] = useState(0)
   
   // 필터 상태
@@ -63,6 +64,8 @@ export default function DataPage() {
 
   const fetchData = async () => {
     setLoading(true)
+    const startTime = Date.now()
+    
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -88,7 +91,8 @@ export default function DataPage() {
       }
       
       const result: DataResponse = await response.json()
-      console.log('데이터 불러오기 결과:', result)
+      const loadTime = Date.now() - startTime
+      console.log(`데이터 불러오기 완료: ${loadTime}ms, ${result.total}개 레코드`)
       
       setData(result.items || [])
       setTotal(result.total || 0)
@@ -575,14 +579,12 @@ export default function DataPage() {
         </div>
 
         {/* Table */}
-        <div className="card">
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                <p className="mt-2 text-gray-500">데이터를 불러오는 중...</p>
-              </div>
-            ) : data.length === 0 ? (
+        {loading ? (
+          <DataTableSkeleton />
+        ) : (
+          <div className="card">
+            <div className="overflow-x-auto">
+              {data.length === 0 ? (
               <div className="text-center py-8">
                 <Database className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">데이터가 없습니다.</p>
@@ -722,9 +724,10 @@ export default function DataPage() {
                       }}
                       className="input-field text-sm"
                     >
-                      <option value={10}>10</option>
                       <option value={50}>50</option>
                       <option value={100}>100</option>
+                      <option value={200}>200</option>
+                      <option value={500}>500</option>
                     </select>
                   </div>
                   
@@ -749,9 +752,10 @@ export default function DataPage() {
                   </div>
                 </div>
               </>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   )

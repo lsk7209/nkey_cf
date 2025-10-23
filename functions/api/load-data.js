@@ -58,31 +58,53 @@ export async function onRequestGet(context) {
       
       const result = await env.KEYWORDS_KV.list({ 
         prefix: 'data:',
-        limit: 100 // 최대 100개 키만 조회
+        limit: 1000 // 최대 1000개 키까지 조회 가능
       });
       const keys = result.keys || [];
       console.log('총 키 개수:', keys.length);
       console.log('조회된 키들:', keys.map(k => k.name));
       
-      // 모든 키 처리 (최대 100개)
-      const maxKeys = Math.min(keys.length, 100);
+      // 배치 처리로 성능 최적화 (최대 1000개)
+      const maxKeys = Math.min(keys.length, 1000);
       const allData = [];
+      const BATCH_SIZE = 10; // 10개씩 배치 처리
       
-      for (let i = 0; i < maxKeys; i++) {
-        const key = keys[i];
-        try {
-          console.log(`데이터 로드 중: ${key.name}`);
-          const data = await env.KEYWORDS_KV.get(key.name);
-          if (data) {
-            const record = JSON.parse(data);
-            allData.push({
-              id: key.name,
-              ...record
-            });
-            console.log(`데이터 로드 성공: ${key.name}`);
+      console.log(`총 ${maxKeys}개 키를 ${BATCH_SIZE}개씩 배치 처리 시작`);
+      
+      for (let batchStart = 0; batchStart < maxKeys; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, maxKeys);
+        const batchKeys = keys.slice(batchStart, batchEnd);
+        
+        console.log(`배치 ${Math.floor(batchStart / BATCH_SIZE) + 1} 처리 중: ${batchStart + 1}-${batchEnd}번째 키`);
+        
+        // 배치 내에서 병렬 처리
+        const batchPromises = batchKeys.map(async (key) => {
+          try {
+            const data = await env.KEYWORDS_KV.get(key.name);
+            if (data) {
+              const record = JSON.parse(data);
+              return {
+                id: key.name,
+                ...record
+              };
+            }
+            return null;
+          } catch (error) {
+            console.error(`데이터 로드 오류 (${key.name}):`, error);
+            return null;
           }
-        } catch (error) {
-          console.error(`데이터 로드 오류 (${key.name}):`, error);
+        });
+        
+        // 배치 결과 대기
+        const batchResults = await Promise.all(batchPromises);
+        const validResults = batchResults.filter(result => result !== null);
+        allData.push(...validResults);
+        
+        console.log(`배치 완료: ${validResults.length}개 데이터 로드됨`);
+        
+        // 배치 간 짧은 대기 (과부하 방지)
+        if (batchEnd < maxKeys) {
+          await new Promise(resolve => setTimeout(resolve, 10)); // 10ms 대기
         }
       }
 

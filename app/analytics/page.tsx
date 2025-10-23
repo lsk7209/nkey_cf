@@ -37,33 +37,82 @@ export default function AnalyticsPage() {
     try {
       setLoading(true)
       
-      // 실제 데이터를 가져오는 API 호출 (현재는 모의 데이터)
-      const mockData: AnalyticsData = {
-        totalKeywords: 1250,
-        totalSearchVolume: 2450000,
-        avgCompetition: 2.3,
-        topKeywords: [
-          { keyword: '풀빌라', searchVolume: 125000, competition: '높음', potentialScore: 8.5 },
-          { keyword: '강원도풀빌라', searchVolume: 89000, competition: '중간', potentialScore: 12.3 },
-          { keyword: '제주도풀빌라', searchVolume: 67000, competition: '중간', potentialScore: 15.7 },
-          { keyword: '경기도풀빌라', searchVolume: 45000, competition: '낮음', potentialScore: 18.2 },
-          { keyword: '부산풀빌라', searchVolume: 32000, competition: '낮음', potentialScore: 22.1 }
-        ],
-        competitionDistribution: {
-          high: 35,
-          medium: 45,
-          low: 20
-        },
-        searchVolumeTrend: [
-          { date: '2024-01-01', volume: 120000 },
-          { date: '2024-01-02', volume: 135000 },
-          { date: '2024-01-03', volume: 142000 },
-          { date: '2024-01-04', volume: 128000 },
-          { date: '2024-01-05', volume: 155000 }
-        ]
+      // 실제 데이터를 가져오는 API 호출
+      const response = await fetch('/api/load-data?page=1&pageSize=1000')
+      
+      if (!response.ok) {
+        throw new Error(`데이터 불러오기 실패: ${response.status}`)
       }
       
-      setAnalyticsData(mockData)
+      const result = await response.json()
+      const allData = result.items || []
+      
+      if (allData.length === 0) {
+        // 데이터가 없으면 빈 분석 데이터 반환
+        setAnalyticsData({
+          totalKeywords: 0,
+          totalSearchVolume: 0,
+          avgCompetition: 0,
+          topKeywords: [],
+          competitionDistribution: { high: 0, medium: 0, low: 0 },
+          searchVolumeTrend: []
+        })
+        return
+      }
+      
+      // 실제 데이터로 분석 수행
+      const totalKeywords = result.total || allData.length
+      const totalSearchVolume = allData.reduce((sum: number, item: any) => 
+        sum + (item.pc_search || 0) + (item.mobile_search || 0), 0)
+      
+      // 경쟁도 분포 계산
+      const competitionCounts = allData.reduce((acc: any, item: any) => {
+        const comp = item.comp_idx || '중간'
+        acc[comp === '높음' ? 'high' : comp === '중간' ? 'medium' : 'low']++
+        return acc
+      }, { high: 0, medium: 0, low: 0 })
+      
+      const competitionDistribution = {
+        high: Math.round((competitionCounts.high / totalKeywords) * 100),
+        medium: Math.round((competitionCounts.medium / totalKeywords) * 100),
+        low: Math.round((competitionCounts.low / totalKeywords) * 100)
+      }
+      
+      // 상위 키워드 추출 (검색량 기준)
+      const topKeywords = allData
+        .map((item: any) => ({
+          keyword: item.rel_keyword || item.keyword,
+          searchVolume: (item.pc_search || 0) + (item.mobile_search || 0),
+          competition: item.comp_idx || '중간',
+          potentialScore: item.potential_score || 0
+        }))
+        .sort((a, b) => b.searchVolume - a.searchVolume)
+        .slice(0, 5)
+      
+      // 평균 경쟁도 계산
+      const avgCompetition = allData.reduce((sum: number, item: any) => {
+        const comp = item.comp_idx || '중간'
+        return sum + (comp === '높음' ? 3 : comp === '중간' ? 2 : 1)
+      }, 0) / totalKeywords
+      
+      // 최근 5일 트렌드 (간단한 샘플링)
+      const searchVolumeTrend = allData
+        .slice(0, 5)
+        .map((item: any, index: number) => ({
+          date: new Date(Date.now() - (4 - index) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          volume: (item.pc_search || 0) + (item.mobile_search || 0)
+        }))
+      
+      const analyticsData: AnalyticsData = {
+        totalKeywords,
+        totalSearchVolume,
+        avgCompetition,
+        topKeywords,
+        competitionDistribution,
+        searchVolumeTrend
+      }
+      
+      setAnalyticsData(analyticsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : '분석 데이터를 불러오는 중 오류가 발생했습니다.')
     } finally {
