@@ -367,74 +367,54 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 3) 배치 저장 로직 (타임아웃 방지를 위해 배치 처리)
-    const BATCH_SIZE = 20; // 한 번에 20개씩 처리
-    const maxItems = Math.min(related.length, 500);
+    // 3) 단순 저장 로직 (복잡한 배치 처리 제거)
     const now = new Date();
     const dateBucket = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,"0")}-${String(now.getUTCDate()).padStart(2,"0")}`;
     const fetchedAt = now.toISOString();
     let savedCount = 0;
     let errorCount = 0;
 
-    console.log(`배치 저장 시작: 총 ${related.length}개 중 최대 ${maxItems}개 처리 (배치 크기: ${BATCH_SIZE})`);
+    console.log(`단순 저장 시작: 총 ${related.length}개 처리`);
 
-    // 배치별로 처리
-    for (let batchStart = 0; batchStart < maxItems; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, maxItems);
-      const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
-      const totalBatches = Math.ceil(maxItems / BATCH_SIZE);
+    // 연관키워드가 없는 경우 검색한 키워드 자체를 저장
+    if (related.length === 0 || !related[0]?.rel_keyword) {
+      console.log(`연관키워드 없음 - 검색 키워드 자체 저장: ${keyword}`);
+      const storageKey = `data:${dateBucket}:${keyword}:${keyword}`;
+      const record = {
+        keyword: keyword,
+        rel_keyword: keyword,
+        fetched_at: fetchedAt,
+        created_at: fetchedAt,
+        is_update: false
+      };
       
-      console.log(`배치 ${batchNumber}/${totalBatches} 처리 중: ${batchStart + 1}-${batchEnd}번째 항목`);
-
-      for (let i = batchStart; i < batchEnd; i++) {
+      try {
+        console.log(`KV 저장 시도: ${storageKey}`);
+        console.log(`저장할 데이터:`, JSON.stringify(record));
+        
+        const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record));
+        console.log(`KV 저장 결과:`, putResult);
+        
+        // 저장 후 검증
+        const verifyData = await env.KEYWORDS_KV.get(storageKey);
+        if (verifyData) {
+          console.log(`저장 검증 성공: ${storageKey}`);
+          savedCount++;
+          console.log(`검색 키워드 저장 완료: ${keyword}`);
+        } else {
+          console.error(`저장 검증 실패: ${storageKey}`);
+          errorCount++;
+        }
+      } catch (error) {
+        console.error(`검색 키워드 저장 오류:`, error);
+        errorCount++;
+      }
+    } else {
+      // 연관키워드가 있는 경우
+      for (let i = 0; i < Math.min(related.length, 10); i++) {
         const item = related[i];
         const rel = item?.rel_keyword ?? "";
-        
-        // 연관키워드가 없는 경우 검색한 키워드 자체를 저장
-        if (!rel) {
-          console.log(`연관키워드 없음 - 검색 키워드 자체 저장: ${keyword}`);
-          const storageKey = `data:${dateBucket}:${keyword}:${keyword}`;
-          const record = {
-            keyword: keyword,
-            rel_keyword: keyword,
-            fetched_at: fetchedAt,
-            created_at: fetchedAt,
-            is_update: false
-          };
-          
-          try {
-            console.log(`KV 저장 시도: ${storageKey}`);
-            console.log(`저장할 데이터:`, JSON.stringify(record));
-            
-            // KV 저장 전 상태 확인
-            console.log(`KV 저장 전 상태 확인: ${storageKey}`);
-            const beforeData = await env.KEYWORDS_KV.get(storageKey);
-            console.log(`저장 전 데이터:`, beforeData);
-            
-            const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record));
-            console.log(`KV 저장 결과:`, putResult);
-            
-            // 저장 후 검증 (즉시)
-            console.log(`저장 검증 시작: ${storageKey}`);
-            const verifyData = await env.KEYWORDS_KV.get(storageKey);
-            console.log(`저장 검증 결과:`, verifyData ? '성공' : '실패');
-            
-            if (verifyData) {
-              console.log(`저장 검증 성공: ${storageKey}`);
-              savedCount++;
-              console.log(`검색 키워드 저장 완료: ${keyword}`);
-            } else {
-              console.error(`저장 검증 실패: ${storageKey}`);
-              errorCount++;
-            }
-          } catch (error) {
-            console.error(`검색 키워드 저장 오류:`, error);
-            console.error(`오류 상세:`, error.message);
-            console.error(`오류 스택:`, error.stack);
-            errorCount++;
-          }
-          continue;
-        }
+        if (!rel) continue;
 
       try {
         // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출
