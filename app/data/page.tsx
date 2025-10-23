@@ -209,12 +209,29 @@ export default function DataPage() {
     setUpdateProgress('문서수 수집을 시작합니다...')
 
     try {
-      // 현재 페이지의 키워드들에 대해 문서수 업데이트
-      const keywords = [...new Set(data.map(item => item.keyword))]
+      // 문서수가 0인 키워드들만 필터링
+      const keywordsWithZeroDocs = data.filter(item => 
+        (item.blog_count || 0) === 0 && 
+        (item.cafe_count || 0) === 0 && 
+        (item.news_count || 0) === 0 && 
+        (item.web_count || 0) === 0
+      )
       
-      for (let i = 0; i < keywords.length; i++) {
-        const keyword = keywords[i]
-        setUpdateProgress(`문서수 수집 중... (${i + 1}/${keywords.length}) - ${keyword}`)
+      if (keywordsWithZeroDocs.length === 0) {
+        alert('문서수가 0인 키워드가 없습니다. 모든 키워드의 문서수가 이미 수집되었습니다.')
+        setIsUpdatingDocs(false)
+        return
+      }
+
+      console.log(`문서수가 0인 키워드 ${keywordsWithZeroDocs.length}개 발견`)
+      setUpdateProgress(`문서수가 0인 키워드 ${keywordsWithZeroDocs.length}개에 대해 문서수 수집을 시작합니다...`)
+
+      // 문서수가 0인 키워드들에 대해 문서수 업데이트
+      const uniqueKeywords = [...new Set(keywordsWithZeroDocs.map(item => item.keyword))]
+      
+      for (let i = 0; i < uniqueKeywords.length; i++) {
+        const keyword = uniqueKeywords[i]
+        setUpdateProgress(`문서수 수집 중... (${i + 1}/${uniqueKeywords.length}) - ${keyword}`)
         
         const response = await fetch('/api/update-documents', {
           method: 'POST',
@@ -241,7 +258,7 @@ export default function DataPage() {
       // 데이터 새로고침
       await fetchData()
       
-      alert('문서수 수집이 완료되었습니다!')
+      alert(`문서수 수집이 완료되었습니다! ${uniqueKeywords.length}개 키워드의 문서수를 수집했습니다.`)
     } catch (error) {
       console.error('문서수 업데이트 오류:', error)
       alert('문서수 수집 중 오류가 발생했습니다.')
