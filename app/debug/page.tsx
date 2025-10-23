@@ -263,8 +263,28 @@ export default function DebugPage() {
                     <span className="text-green-700">API 키 설정됨</span>
                     </div>
                   <div className="text-sm text-gray-600">
-                    <p>SearchAd 키: {debugInfo.apiStatus.searchadKeys ? '설정됨' : '없음'}</p>
-                    <p>OpenAPI 키: {debugInfo.apiStatus.openapiKeys ? '설정됨' : '없음'}</p>
+                    <p>SearchAd 키: {debugInfo.apiStatus.totalSearchAdKeys || 0}개 설정됨</p>
+                    <p>OpenAPI 키: {debugInfo.apiStatus.totalOpenApiKeys || 0}개 설정됨</p>
+                    {debugInfo.apiStatus.searchAdKeys && debugInfo.apiStatus.searchAdKeys.length > 0 && (
+                      <div className="mt-2">
+                        <p className="font-medium">SearchAd 키 상세:</p>
+                        {debugInfo.apiStatus.searchAdKeys.map((key: any, index: number) => (
+                          <p key={index} className="ml-2 text-xs">
+                            키 {key.id}: {key.hasLicense && key.hasSecret && key.hasCustomer ? '완전 설정' : '부분 설정'}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {debugInfo.apiStatus.openApiKeys && debugInfo.apiStatus.openApiKeys.length > 0 && (
+                      <div className="mt-2">
+                        <p className="font-medium">OpenAPI 키 상세:</p>
+                        {debugInfo.apiStatus.openApiKeys.map((key: any, index: number) => (
+                          <p key={index} className="ml-2 text-xs">
+                            키 {key.id}: {key.hasClientId && key.hasClientSecret ? '완전 설정' : '부분 설정'}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                       </div>
                   </div>
                 ) : (

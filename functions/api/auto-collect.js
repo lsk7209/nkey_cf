@@ -405,14 +405,62 @@ async function fetchRelatedKeywords(env, seedKeyword) {
 
 // SearchAd API 키 선택
 function getAvailableSearchAdKey(env) {
-  const keys = [
-    {
+  const keys = [];
+  
+  // 다중 키 지원 (1-10번까지 확인)
+  for (let i = 1; i <= 10; i++) {
+    const accessLicense = env[`SEARCHAD_ACCESS_LICENSE_${i}`];
+    const secretKey = env[`SEARCHAD_SECRET_KEY_${i}`];
+    const customerId = env[`SEARCHAD_CUSTOMER_ID_${i}`];
+    
+    if (accessLicense && secretKey && customerId) {
+      keys.push({
+        accessLicense,
+        secretKey,
+        customerId
+      });
+    }
+  }
+  
+  // 기존 단일 키도 확인
+  if (env.SEARCHAD_ACCESS_LICENSE && env.SEARCHAD_SECRET_KEY && env.SEARCHAD_CUSTOMER_ID) {
+    keys.push({
       accessLicense: env.SEARCHAD_ACCESS_LICENSE,
       secretKey: env.SEARCHAD_SECRET_KEY,
       customerId: env.SEARCHAD_CUSTOMER_ID
-    }
-  ].filter(key => key.accessLicense && key.secretKey && key.customerId);
+    });
+  }
   
+  console.log(`사용 가능한 SearchAd 키: ${keys.length}개`);
+  return keys.length > 0 ? keys[0] : null;
+}
+
+// OpenAPI 키 선택
+function getAvailableOpenApiKey(env) {
+  const keys = [];
+  
+  // 다중 키 지원 (1-10번까지 확인)
+  for (let i = 1; i <= 10; i++) {
+    const clientId = env[`NAVER_CLIENT_ID_${i}`];
+    const clientSecret = env[`NAVER_CLIENT_SECRET_${i}`];
+    
+    if (clientId && clientSecret) {
+      keys.push({
+        clientId,
+        clientSecret
+      });
+    }
+  }
+  
+  // 기존 단일 키도 확인
+  if (env.NAVER_CLIENT_ID && env.NAVER_CLIENT_SECRET) {
+    keys.push({
+      clientId: env.NAVER_CLIENT_ID,
+      clientSecret: env.NAVER_CLIENT_SECRET
+    });
+  }
+  
+  console.log(`사용 가능한 OpenAPI 키: ${keys.length}개`);
   return keys.length > 0 ? keys[0] : null;
 }
 
@@ -469,8 +517,9 @@ async function saveRelatedKeywords(env, seedKeyword, relatedKeywords) {
       try {
         console.log(`자동수집 - 문서수 수집 중: ${rel}`);
         
-        // OpenAPI 키 확인
-        if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) {
+        // OpenAPI 키 확인 (다중 키 지원)
+        const openApiKey = getAvailableOpenApiKey(env);
+        if (!openApiKey) {
           console.log('OpenAPI 키가 설정되지 않음 - 모의 문서수 생성');
           // 모의 문서수 생성
           blogCount = Math.floor(Math.random() * 5000) + 1000;
@@ -487,8 +536,8 @@ async function saveRelatedKeywords(env, seedKeyword, relatedKeywords) {
           const blogResponse = await fetch(`https://openapi.naver.com/v1/search/blog.json?query=${query}&display=1`, {
             method: 'GET',
             headers: {
-              'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-              'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+              'X-Naver-Client-Id': openApiKey.clientId,
+              'X-Naver-Client-Secret': openApiKey.clientSecret
             },
             signal: controller.signal
           });
@@ -505,8 +554,8 @@ async function saveRelatedKeywords(env, seedKeyword, relatedKeywords) {
           const cafeResponse = await fetch(`https://openapi.naver.com/v1/search/cafearticle.json?query=${query}&display=1`, {
             method: 'GET',
             headers: {
-              'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-              'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+              'X-Naver-Client-Id': openApiKey.clientId,
+              'X-Naver-Client-Secret': openApiKey.clientSecret
             },
             signal: controller.signal
           });
@@ -523,8 +572,8 @@ async function saveRelatedKeywords(env, seedKeyword, relatedKeywords) {
           const newsResponse = await fetch(`https://openapi.naver.com/v1/search/news.json?query=${query}&display=1`, {
             method: 'GET',
             headers: {
-              'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-              'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+              'X-Naver-Client-Id': openApiKey.clientId,
+              'X-Naver-Client-Secret': openApiKey.clientSecret
             },
             signal: controller.signal
           });
@@ -541,8 +590,8 @@ async function saveRelatedKeywords(env, seedKeyword, relatedKeywords) {
           const webResponse = await fetch(`https://openapi.naver.com/v1/search/webkr.json?query=${query}&display=1`, {
             method: 'GET',
             headers: {
-              'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-              'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET
+              'X-Naver-Client-Id': openApiKey.clientId,
+              'X-Naver-Client-Secret': openApiKey.clientSecret
             },
             signal: controller.signal
           });
