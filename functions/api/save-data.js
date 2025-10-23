@@ -559,7 +559,9 @@ export async function onRequestPost(context) {
           
           if (shouldSkip) {
             console.log(`건너뛰기 완료 (${i+1}/${maxItems}): ${rel}`);
-            continue; // 다음 항목으로 넘어감
+            // 테스트를 위해 임시로 건너뛰기 비활성화
+            // continue; // 다음 항목으로 넘어감
+            console.log(`테스트: 건너뛰기 비활성화 - 강제 저장: ${rel}`);
           }
           
           if (shouldUpdate) {
