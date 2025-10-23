@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, Download, Search, Filter, Calendar } from 'lucide-react'
+import { Database, Download, Search, Filter, Calendar, XCircle } from 'lucide-react'
 import DataTableSkeleton from '../components/DataTableSkeleton'
 
 interface KeywordRecord {
@@ -40,6 +40,7 @@ export default function DataPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(500)
   const [totalPages, setTotalPages] = useState(0)
+  const [error, setError] = useState<string | null>(null)
   
   // 필터 상태
   const [query, setQuery] = useState('')
@@ -64,6 +65,7 @@ export default function DataPage() {
 
   const fetchData = async () => {
     setLoading(true)
+    setError(null)
     const startTime = Date.now()
     
     try {
@@ -82,8 +84,10 @@ export default function DataPage() {
       const response = await fetch(`/api/load-data?${params.toString()}`)
       
       if (!response.ok) {
-        console.error(`데이터 불러오기 실패: ${response.status}`)
-        // 오류 시에도 빈 데이터로 처리
+        const errorText = await response.text()
+        const errorMessage = `데이터 불러오기 실패: ${response.status} - ${errorText}`
+        console.error(errorMessage)
+        setError(errorMessage)
         setData([])
         setTotal(0)
         setTotalPages(0)
@@ -94,12 +98,18 @@ export default function DataPage() {
       const loadTime = Date.now() - startTime
       console.log(`데이터 불러오기 완료: ${loadTime}ms, ${result.total}개 레코드`)
       
+      if (result.debug) {
+        console.log('디버그 정보:', result.debug)
+      }
+      
       setData(result.items || [])
       setTotal(result.total || 0)
       setTotalPages(result.totalPages || 0)
+      setError(null)
     } catch (error) {
-      console.error('Error fetching data:', error)
-      // 에러 시 빈 데이터 표시
+      const errorMessage = `데이터 불러오기 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
+      console.error(errorMessage)
+      setError(errorMessage)
       setData([])
       setTotal(0)
       setTotalPages(0)
@@ -587,6 +597,25 @@ export default function DataPage() {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="card bg-red-50 border-red-200">
+            <div className="flex items-center gap-3 p-4">
+              <XCircle className="h-6 w-6 text-red-500" />
+              <div>
+                <h3 className="text-red-800 font-semibold">데이터 로드 오류</h3>
+                <p className="text-red-600 text-sm mt-1">{error}</p>
+                <button
+                  onClick={fetchData}
+                  className="mt-2 text-sm text-red-700 underline hover:text-red-800"
+                >
+                  다시 시도
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         {loading ? (
           <DataTableSkeleton />
@@ -597,6 +626,12 @@ export default function DataPage() {
               <div className="text-center py-8">
                 <Database className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">데이터가 없습니다.</p>
+                <button
+                  onClick={fetchData}
+                  className="mt-4 btn-primary"
+                >
+                  새로고침
+                </button>
               </div>
             ) : (
               <>
