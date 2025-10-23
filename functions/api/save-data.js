@@ -389,7 +389,39 @@ export async function onRequestPost(context) {
       for (let i = batchStart; i < batchEnd; i++) {
         const item = related[i];
         const rel = item?.rel_keyword ?? "";
-        if (!rel) continue;
+        
+        // 연관키워드가 없는 경우 검색한 키워드 자체를 저장
+        if (!rel) {
+          console.log(`연관키워드 없음 - 검색 키워드 자체 저장: ${keyword}`);
+          const storageKey = `data:${dateBucket}:${keyword}:${keyword}`;
+          const record = {
+            keyword: keyword,
+            rel_keyword: keyword,
+            fetched_at: fetchedAt,
+            created_at: fetchedAt,
+            is_update: false
+          };
+          
+          try {
+            console.log(`KV 저장 시도: ${storageKey}`);
+            const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record));
+            console.log(`KV 저장 결과:`, putResult);
+            
+            const verifyData = await env.KEYWORDS_KV.get(storageKey);
+            if (verifyData) {
+              console.log(`저장 검증 성공: ${storageKey}`);
+              savedCount++;
+              console.log(`검색 키워드 저장 완료: ${keyword}`);
+            } else {
+              console.error(`저장 검증 실패: ${storageKey}`);
+              errorCount++;
+            }
+          } catch (error) {
+            console.error(`검색 키워드 저장 오류:`, error);
+            errorCount++;
+          }
+          continue;
+        }
 
       try {
         // 문서수 자동 업데이트가 활성화된 경우 OpenAPI 호출
