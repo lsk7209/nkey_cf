@@ -578,14 +578,20 @@ export async function onRequestPost(context) {
           console.log(`저장할 데이터:`, JSON.stringify(record, null, 2));
           
           try {
+            console.log(`KV 저장 시작: ${storageKey}`);
+            console.log(`저장할 데이터 크기: ${JSON.stringify(record).length} bytes`);
+            
             const putResult = await env.KEYWORDS_KV.put(storageKey, JSON.stringify(record), {
               expirationTtl: 60 * 60 * 24 * 30 // 30일 후 만료
             });
             
             console.log(`KV 저장 결과:`, putResult);
             
-            // 저장 후 검증
+            // 저장 후 검증 (즉시)
+            console.log(`저장 검증 시작: ${storageKey}`);
             const verifyData = await env.KEYWORDS_KV.get(storageKey);
+            console.log(`저장 검증 결과:`, verifyData ? '성공' : '실패');
+            
             if (verifyData) {
               console.log(`저장 검증 성공: ${storageKey}`);
               savedCount++;
@@ -596,6 +602,8 @@ export async function onRequestPost(context) {
             }
           } catch (kvError) {
             console.error(`KV 저장 중 오류 발생:`, kvError);
+            console.error(`오류 상세:`, kvError.message);
+            console.error(`오류 스택:`, kvError.stack);
             errorCount++;
           }
         } catch (saveError) {
