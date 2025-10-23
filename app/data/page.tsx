@@ -31,6 +31,7 @@ interface DataResponse {
   items: KeywordRecord[]
   page: number
   totalPages: number
+  debug?: any
 }
 
 export default function DataPage() {

@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
           competition: item.comp_idx || '중간',
           potentialScore: item.potential_score || 0
         }))
-        .sort((a, b) => b.searchVolume - a.searchVolume)
+        .sort((a: any, b: any) => b.searchVolume - a.searchVolume)
         .slice(0, 5)
       
       // 평균 경쟁도 계산

@@ -7,7 +7,7 @@ interface DebugInfo {
   kvStatus: any
   apiStatus: any
   dataCount: number
-  error?: string
+  error?: string | null
 }
 
 export default function DebugPage() {
