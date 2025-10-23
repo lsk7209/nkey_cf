@@ -658,14 +658,7 @@ export async function onRequestPost(context) {
         errorCount++;
         console.error(`데이터 저장 오류 (${rel}):`, error.message);
       }
-      } // 배치 내부 루프 종료
-      
-      // 배치 간 짧은 대기 (타임아웃 방지)
-      if (batchEnd < maxItems) {
-        console.log(`배치 ${batchNumber} 완료. 다음 배치 준비 중...`);
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms 대기
-      }
-    } // 배치 루프 종료
+      } // 연관키워드 루프 종료
 
     const skippedCount = maxItems - savedCount - errorCount;
     const result = {
