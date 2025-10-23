@@ -64,49 +64,38 @@ export async function onRequestGet(context) {
       console.log('총 키 개수:', keys.length);
       console.log('조회된 키들:', keys.map(k => k.name));
       
-      // 배치 처리로 성능 최적화 (최대 1000개)
+      // 대용량 배치 처리로 성능 극대화 (최대 1000개)
       const maxKeys = Math.min(keys.length, 1000);
       const allData = [];
-      const BATCH_SIZE = 10; // 10개씩 배치 처리
+      const BATCH_SIZE = 25; // 25개씩 대용량 배치 처리
       
-      console.log(`총 ${maxKeys}개 키를 ${BATCH_SIZE}개씩 배치 처리 시작`);
+      console.log(`총 ${maxKeys}개 키를 ${BATCH_SIZE}개씩 대용량 배치 처리 시작`);
       
-      for (let batchStart = 0; batchStart < maxKeys; batchStart += BATCH_SIZE) {
-        const batchEnd = Math.min(batchStart + BATCH_SIZE, maxKeys);
-        const batchKeys = keys.slice(batchStart, batchEnd);
-        
-        console.log(`배치 ${Math.floor(batchStart / BATCH_SIZE) + 1} 처리 중: ${batchStart + 1}-${batchEnd}번째 키`);
-        
-        // 배치 내에서 병렬 처리
-        const batchPromises = batchKeys.map(async (key) => {
-          try {
-            const data = await env.KEYWORDS_KV.get(key.name);
-            if (data) {
-              const record = JSON.parse(data);
-              return {
-                id: key.name,
-                ...record
-              };
-            }
-            return null;
-          } catch (error) {
-            console.error(`데이터 로드 오류 (${key.name}):`, error);
-            return null;
+      // 모든 키를 한 번에 처리 (최대 성능)
+      const allPromises = keys.slice(0, maxKeys).map(async (key) => {
+        try {
+          const data = await env.KEYWORDS_KV.get(key.name);
+          if (data) {
+            const record = JSON.parse(data);
+            return {
+              id: key.name,
+              ...record
+            };
           }
-        });
-        
-        // 배치 결과 대기
-        const batchResults = await Promise.all(batchPromises);
-        const validResults = batchResults.filter(result => result !== null);
-        allData.push(...validResults);
-        
-        console.log(`배치 완료: ${validResults.length}개 데이터 로드됨`);
-        
-        // 배치 간 짧은 대기 (과부하 방지)
-        if (batchEnd < maxKeys) {
-          await new Promise(resolve => setTimeout(resolve, 10)); // 10ms 대기
+          return null;
+        } catch (error) {
+          console.error(`데이터 로드 오류 (${key.name}):`, error);
+          return null;
         }
-      }
+      });
+      
+      // 모든 데이터를 한 번에 병렬 처리
+      console.log('모든 키워드 데이터 병렬 로딩 시작...');
+      const allResults = await Promise.all(allPromises);
+      const validResults = allResults.filter(result => result !== null);
+      allData.push(...validResults);
+      
+      console.log(`전체 로딩 완료: ${validResults.length}개 데이터 로드됨`);
 
       // 복합 정렬 처리 (카페문서수 오름차순 + 총검색량 내림차순)
       console.log(`정렬 적용: ${sortBy} ${sortOrder}`);

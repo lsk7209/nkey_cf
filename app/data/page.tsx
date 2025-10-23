@@ -117,19 +117,28 @@ export default function DataPage() {
     setUpdateProgress('전체 문서수 업데이트를 시작합니다...')
 
     try {
-      const response = await fetch('/api/bulk-update-documents', {
+      console.log('문서수 업데이트 요청 시작...')
+      
+      const response = await fetch('/api/update-documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          keyword: 'all', // 모든 키워드
+          limit: 100
+        })
       })
 
+      console.log('문서수 업데이트 응답:', response.status)
+      
       if (!response.ok) {
-        throw new Error('대량 문서수 업데이트 실패')
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP ${response.status}`)
       }
 
       const result = await response.json()
-      console.log('대량 문서수 업데이트 결과:', result)
+      console.log('문서수 업데이트 결과:', result)
       
       setUpdateProgress('전체 문서수 업데이트가 완료되었습니다. 데이터를 새로고침합니다...')
       
@@ -139,7 +148,7 @@ export default function DataPage() {
       alert(`전체 문서수 업데이트 완료: ${result.updatedCount}개 업데이트됨${result.errorCount > 0 ? `, ${result.errorCount}개 오류` : ''}`)
     } catch (error) {
       console.error('대량 문서수 업데이트 오류:', error)
-      alert('전체 문서수 업데이트 중 오류가 발생했습니다.')
+      alert(`전체 문서수 업데이트 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
     } finally {
       setIsUpdatingDocs(false)
       setUpdateProgress('')

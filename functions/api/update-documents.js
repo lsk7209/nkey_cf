@@ -9,6 +9,28 @@ export async function onRequestPost(context) {
 
     console.log(`문서수 업데이트 시작: ${keyword}, 제한: ${limit}개`);
 
+    // OpenAPI 키 확인
+    if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) {
+      console.error('OpenAPI 키가 설정되지 않음:', {
+        hasClientId: !!env.NAVER_CLIENT_ID,
+        hasClientSecret: !!env.NAVER_CLIENT_SECRET
+      });
+      return new Response(JSON.stringify({
+        success: false,
+        message: "OpenAPI 키가 설정되지 않았습니다",
+        debug: {
+          hasClientId: !!env.NAVER_CLIENT_ID,
+          hasClientSecret: !!env.NAVER_CLIENT_SECRET
+        }
+      }), { 
+        status: 400,
+        headers: { 
+          "content-type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    }
+
     if (!keyword) {
       return new Response(JSON.stringify({
         success: false,
@@ -82,12 +104,17 @@ export async function onRequestPost(context) {
           const openApiData = await openApiResponse.json();
           const blogCount = openApiData.total || 0;
           
+          console.log(`OpenAPI 응답 성공: ${relKeyword} - 블로그 ${blogCount}개`);
+          
           // 기존 데이터 업데이트
+          const newTotalDocs = blogCount + (data.cafe_count || 0) + (data.news_count || 0) + (data.web_count || 0);
+          const newPotentialScore = newTotalDocs > 0 ? ((data.pc_search + data.mobile_search) / newTotalDocs) * 100 : 0;
+          
           const updatedData = {
             ...data,
             blog_count: blogCount,
-            total_docs: blogCount + (data.cafe_count || 0) + (data.news_count || 0) + (data.web_count || 0),
-            potential_score: data.total_docs > 0 ? ((data.pc_search + data.mobile_search) / data.total_docs) * 100 : 0,
+            total_docs: newTotalDocs,
+            potential_score: newPotentialScore,
             updated_at: now,
             doc_updated_at: now
           };
@@ -100,7 +127,8 @@ export async function onRequestPost(context) {
           updatedCount++;
           console.log(`문서수 업데이트 완료: ${relKeyword} (블로그: ${blogCount})`);
         } else {
-          console.log(`OpenAPI 호출 실패: ${openApiResponse.status}`);
+          const errorText = await openApiResponse.text();
+          console.log(`OpenAPI 호출 실패: ${openApiResponse.status} - ${errorText}`);
           errorCount++;
         }
       } catch (error) {
