@@ -97,12 +97,19 @@ export default function DataPage() {
       const result: DataResponse = await response.json()
       const loadTime = Date.now() - startTime
       console.log(`데이터 불러오기 완료: ${loadTime}ms, ${result.total}개 레코드`)
+      console.log('API 응답 전체:', result)
+      console.log('items 배열:', result.items)
+      console.log('items 길이:', result.items?.length)
       
       if (result.debug) {
         console.log('디버그 정보:', result.debug)
       }
       
-      setData(result.items || [])
+      const items = result.items || []
+      console.log('설정할 데이터:', items)
+      console.log('데이터 타입:', typeof items, Array.isArray(items))
+      
+      setData(items)
       setTotal(result.total || 0)
       setTotalPages(result.totalPages || 0)
       setError(null)
@@ -597,6 +604,21 @@ export default function DataPage() {
           </div>
         </div>
 
+        {/* Debug Info */}
+        <div className="card bg-blue-50 border-blue-200 mb-4">
+          <div className="p-4">
+            <h3 className="text-blue-800 font-semibold mb-2">디버그 정보</h3>
+            <div className="text-sm text-blue-600 space-y-1">
+              <p>로딩 상태: {loading ? '로딩 중' : '완료'}</p>
+              <p>데이터 개수: {data.length}</p>
+              <p>총 개수: {total}</p>
+              <p>현재 페이지: {page} / {totalPages}</p>
+              <p>페이지 크기: {pageSize}</p>
+              {error && <p className="text-red-600">오류: {error}</p>}
+            </div>
+          </div>
+        </div>
+
         {/* Error Message */}
         {error && (
           <div className="card bg-red-50 border-red-200">
@@ -626,6 +648,11 @@ export default function DataPage() {
               <div className="text-center py-8">
                 <Database className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">데이터가 없습니다.</p>
+                <div className="mt-4 text-sm text-gray-400">
+                  <p>총 개수: {total}</p>
+                  <p>현재 페이지: {page}</p>
+                  <p>페이지 크기: {pageSize}</p>
+                </div>
                 <button
                   onClick={fetchData}
                   className="mt-4 btn-primary"
