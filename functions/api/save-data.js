@@ -690,7 +690,7 @@ export async function onRequestPost(context) {
         "content-type": "application/json",
         "Access-Control-Allow-Origin": "*"
       }
-    });
+    });}
   } catch (error) {
     console.error('데이터 저장 요청 오류:', error);
     return new Response(JSON.stringify({
