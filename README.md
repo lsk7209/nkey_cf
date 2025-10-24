@@ -282,6 +282,24 @@ CSV 다운로드 (쿼리 파라미터는 /api/data와 동일)
 - **안전장치**: 수집일 정보가 없으면 덮어쓰기
 - **로깅**: 중복 처리 이유와 일수를 상세 로그로 기록
 
+## 8. 문제 해결
+
+### KV 바인딩 오류 해결
+**증상**: `KEYWORDS_KV not bound` 오류 발생
+**원인**: Cloudflare Pages 재배포 시 KV 바인딩이 초기화될 수 있음
+**해결방법**:
+1. **Cloudflare Dashboard** → **Pages** → **nkey-cf** 프로젝트
+2. **Settings** → **Functions** → **KV Namespaces**
+3. **Add binding** 클릭
+4. **Variable name**: `KEYWORDS_KV`
+5. **KV namespace**: `3b91498eb19f49b6a7355aab2c6cabf8`
+6. **Save** 클릭
+
+### JavaScript 구문 오류 해결
+**증상**: `Unexpected "catch"` 또는 `Cannot access 'pageSize' before initialization`
+**원인**: JavaScript 구문 오류
+**해결방법**: 코드 수정 후 `git push origin main`으로 자동 배포
+
 ## 라이선스
 
 MIT License
