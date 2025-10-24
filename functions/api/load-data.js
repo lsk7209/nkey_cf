@@ -11,7 +11,6 @@ export async function onRequestGet(context) {
       total: 0,
       items: [],
       page: 1,
-      pageSize: 50,
       totalPages: 0,
       debug: {
         kvAvailable,

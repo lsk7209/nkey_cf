@@ -9,3 +9,6 @@ kv_namespaces = [
 
 [env.production]
 vars = { ENVIRONMENT = "production", KV_BINDING_FORCE_RELOAD = "2025-01-22" }
+kv_namespaces = [
+  { binding = "KEYWORDS_KV", id = "3b91498eb19f49b6a7355aab2c6cabf8" }
+]
