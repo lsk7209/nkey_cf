@@ -4,10 +4,7 @@ pages_build_output_dir = "out"
 
 # KV 바인딩 (Cloudflare 문서 형식)
 kv_namespaces = [
-  {
-    binding = "KEYWORDS_KV"
-    id = "3b91498eb19f49b6a7355aab2c6cabf8"
-  }
+  { binding = "KEYWORDS_KV", id = "3b91498eb19f49b6a7355aab2c6cabf8" }
 ]
 
 [env.production]
